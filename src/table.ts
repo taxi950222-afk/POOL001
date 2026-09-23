@@ -18,6 +18,18 @@ import {
 
 const WOOD_BOTTOM = -0.028
 const WOOD_TOP = 0.064
+/** Inner half of the 0.18 m rail, stopped just before the diamond sights at 0.0889 m. */
+const CLOTH_REACH = 0.084
+const ROUND_R = WOOD_TOP - NOSE_H
+/** Continuous outer oak starts here, past the side-pocket back wall. */
+const OAK_SPLIT = 0.15
+const LIP_R = 0.013
+const OUTER_R = 0.028
+const V_CORNER = 0.085
+const APRON_H = 0.16
+const APRON_T = 0.048
+const APRON_R = 0.018
+const HOLE_HALF = 0.052
 
 function addBox(
   group: THREE.Group,
@@ -106,34 +118,9 @@ interface XZ {
   z: number
 }
 
-interface RailCuts {
-  nose: number
-  wood: number
-  nWest: number
-  nEast: number
-  sWest: number
-  sEast: number
-  eSouth: number
-  eNorth: number
-  wSouth: number
-  wNorth: number
-}
-
 function localToWorld(mount: PocketMount, x: number, y: number, z: number): [number, number, number] {
   const a = mountAxes(mount)
   return [mount.x + x * a.xx + z * a.zx, mount.y + y, mount.z + x * a.xz + z * a.zz]
-}
-
-function worldToLocal(mount: PocketMount, x: number, z: number): XZ {
-  const a = mountAxes(mount)
-  const dx = x - mount.x
-  const dz = z - mount.z
-  return { x: dx * a.xx + dz * a.xz, z: dx * a.zx + dz * a.zz }
-}
-
-function mountMatrix(mount: PocketMount) {
-  const a = mountAxes(mount)
-  return new THREE.Matrix4().set(a.xx, 0, a.zx, mount.x, 0, 1, 0, mount.y, a.xz, 0, a.zz, mount.z, 0, 0, 0, 1)
 }
 
 /** Lip through the jawRadius fillet to point T. Corner and side stay different curves. */
@@ -165,13 +152,6 @@ function jawOpening(params: PocketParams, kind: PocketMount['kind']): { left: XZ
   return { left, right }
 }
 
-function offsetToward(p: XZ, aim: XZ, dist: number): XZ {
-  const dx = aim.x - p.x
-  const dz = aim.z - p.z
-  const len = Math.hypot(dx, dz) || 1
-  return { x: p.x + (dx / len) * dist, z: p.z + (dz / len) * dist }
-}
-
 type RailId = 'n' | 's' | 'e' | 'w'
 
 function attachRail(x: number, z: number): RailId {
@@ -192,62 +172,20 @@ function pushQuad(pos: number[], a: number[], b: number[], c: number[], d: numbe
   pos.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2], a[0], a[1], a[2], c[0], c[1], c[2], d[0], d[1], d[2])
 }
 
-function addLocalBox(
-  group: THREE.Group,
-  mat: THREE.Material,
-  mount: PocketMount,
-  x0: number,
-  x1: number,
-  y0: number,
-  y1: number,
-  z0: number,
-  z1: number,
-) {
-  const w = Math.abs(x1 - x0)
-  const h = Math.abs(y1 - y0)
-  const d = Math.abs(z1 - z0)
-  if (w < 1e-6 || h < 1e-6 || d < 1e-6) return
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat)
-  mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
-  mesh.applyMatrix4(mountMatrix(mount))
-  mesh.castShadow = true
-  mesh.receiveShadow = true
-  group.add(mesh)
+interface SectionPt {
+  u: number
+  y: number
 }
 
-function bandFromLocal(
-  group: THREE.Group,
-  mat: THREE.Material,
-  mount: PocketMount,
-  pts: XZ[],
-  aimOf: (p: XZ, i: number) => XZ,
-  inset: number,
-  thick: number,
-  y0: number,
-  y1: number,
-) {
-  const pos: number[] = []
-  const corner = (p: XZ, i: number, y: number, dist: number) => {
-    const q = dist === 0 ? p : offsetToward(p, aimOf(p, i), dist)
-    return localToWorld(mount, q.x, y, q.z)
-  }
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = pts[i]
-    const b = pts[i + 1]
-    if (!a || !b) continue
-    const o0 = corner(a, i, y0, inset)
-    const o1 = corner(b, i + 1, y0, inset)
-    const i0 = corner(a, i, y0, thick)
-    const i1 = corner(b, i + 1, y0, thick)
-    const O0 = corner(a, i, y1, inset)
-    const O1 = corner(b, i + 1, y1, inset)
-    const I0 = corner(a, i, y1, thick)
-    const I1 = corner(b, i + 1, y1, thick)
-    pushQuad(pos, o0, o1, O1, O0)
-    pushQuad(pos, i1, i0, I0, I1)
-    pushQuad(pos, O0, O1, I1, I0)
-    pushQuad(pos, i0, i1, o1, o0)
-  }
+interface PathPt {
+  x: number
+  z: number
+  nx: number
+  nz: number
+}
+
+function addMesh(group: THREE.Group, mat: THREE.Material, pos: number[]) {
+  if (pos.length < 9) return
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
   geo.computeVertexNormals()
@@ -257,35 +195,319 @@ function bandFromLocal(
   group.add(mesh)
 }
 
-/**
- * One opening for every pocket. The curve, the 45° corner nose, and the side
- * mouth all come from that pocket's parameter row and its mount.
- * Wood starts rubberThickness behind the nose, so the seam is rubber to leather.
- */
-function addPocketOpenings(root: THREE.Group, mats: TableMaterials): RailCuts {
+function sweepSection(pos: number[], path: PathPt[], section: SectionPt[], capStart: boolean, capEnd: boolean) {
+  if (path.length < 2 || section.length < 2) return
+  const rings: number[][][] = []
+  for (const p of path) {
+    const ring: number[][] = []
+    for (const s of section) ring.push([p.x + p.nx * s.u, BED + s.y, p.z + p.nz * s.u])
+    rings.push(ring)
+  }
+  for (let i = 0; i < rings.length - 1; i++) {
+    const a = rings[i]
+    const b = rings[i + 1]
+    if (!a || !b) continue
+    for (let j = 0; j < section.length - 1; j++) {
+      const a0 = a[j]
+      const a1 = a[j + 1]
+      const b0 = b[j]
+      const b1 = b[j + 1]
+      if (!a0 || !a1 || !b0 || !b1) continue
+      pushQuad(pos, a0, b0, b1, a1)
+    }
+  }
+  const cap = (ring: number[][] | undefined, flip: boolean) => {
+    if (!ring || ring.length < 3) return
+    const c = [0, 0, 0]
+    for (const p of ring) {
+      c[0] += p[0] ?? 0
+      c[1] += p[1] ?? 0
+      c[2] += p[2] ?? 0
+    }
+    c[0] /= ring.length
+    c[1] /= ring.length
+    c[2] /= ring.length
+    for (let i = 0; i < ring.length - 1; i++) {
+      const a = ring[i]
+      const b = ring[i + 1]
+      if (!a || !b) continue
+      if (flip) pos.push(c[0], c[1], c[2], b[0] ?? 0, b[1] ?? 0, b[2] ?? 0, a[0] ?? 0, a[1] ?? 0, a[2] ?? 0)
+      else pos.push(c[0], c[1], c[2], a[0] ?? 0, a[1] ?? 0, a[2] ?? 0, b[0] ?? 0, b[1] ?? 0, b[2] ?? 0)
+    }
+  }
+  if (capStart) cap(rings[0], true)
+  if (capEnd) cap(rings[rings.length - 1], false)
+}
+
+function noseSection(): SectionPt[] {
+  const pts: SectionPt[] = []
+  const yBed = 0.0018
+  const s = Math.max(-1, Math.min(1, (yBed - LIP_R) / LIP_R))
+  const thetaBed = Math.PI - Math.asin(s)
+  const fillet = 5
+  for (let i = 0; i <= fillet; i++) {
+    const theta = thetaBed + (Math.PI - thetaBed) * (i / fillet)
+    pts.push({ u: LIP_R + LIP_R * Math.cos(theta), y: LIP_R + LIP_R * Math.sin(theta) })
+  }
+  const vertical = 3
+  for (let i = 1; i <= vertical; i++) {
+    pts.push({ u: 0, y: LIP_R + (NOSE_H - LIP_R) * (i / vertical) })
+  }
+  const arc = 8
+  for (let i = 1; i <= arc; i++) {
+    const theta = Math.PI - (i / arc) * (Math.PI / 2)
+    pts.push({ u: ROUND_R + ROUND_R * Math.cos(theta), y: NOSE_H + ROUND_R * Math.sin(theta) })
+  }
+  const thick = 0.004
+  const ri = ROUND_R - thick
+  pts.push({ u: ROUND_R, y: WOOD_TOP - thick })
+  for (let i = arc - 1; i >= 1; i--) {
+    const theta = Math.PI - (i / arc) * (Math.PI / 2)
+    pts.push({ u: ROUND_R + ri * Math.cos(theta), y: NOSE_H + ri * Math.sin(theta) })
+  }
+  pts.push({ u: thick, y: NOSE_H })
+  pts.push({ u: thick, y: LIP_R })
+  const first = pts[0]
+  if (first) pts.push({ u: first.u, y: first.y })
+  return pts
+}
+
+function cabinetSection(): SectionPt[] {
+  const inner = -(RAIL - OAK_SPLIT)
+  const bottom = WOOD_BOTTOM - APRON_H
+  const pts: SectionPt[] = [
+    { u: inner, y: WOOD_BOTTOM },
+    { u: inner, y: WOOD_TOP },
+    { u: -OUTER_R, y: WOOD_TOP },
+  ]
+  const n = 8
+  for (let i = 1; i <= n; i++) {
+    const phi = Math.PI / 2 - (i / n) * (Math.PI / 2)
+    pts.push({
+      u: -OUTER_R + OUTER_R * Math.cos(phi),
+      y: WOOD_TOP - OUTER_R + OUTER_R * Math.sin(phi),
+    })
+  }
+  pts.push({ u: 0, y: bottom + APRON_R })
+  for (let i = 1; i <= n; i++) {
+    const phi = -(i / n) * (Math.PI / 2)
+    pts.push({
+      u: -APRON_R + APRON_R * Math.cos(phi),
+      y: bottom + APRON_R + APRON_R * Math.sin(phi),
+    })
+  }
+  pts.push({ u: -APRON_T, y: bottom })
+  pts.push({ u: -APRON_T, y: WOOD_BOTTOM })
+  pts.push({ u: inner, y: WOOD_BOTTOM })
+  return pts
+}
+
+function roundedRectPath(hx: number, hz: number, r: number): PathPt[] {
+  const path: PathPt[] = []
+  const n = 12
+  const arc = (cx: number, cz: number, a0: number, a1: number) => {
+    for (let i = 1; i <= n; i++) {
+      const a = a0 + ((a1 - a0) * i) / n
+      path.push({ x: cx + r * Math.cos(a), z: cz + r * Math.sin(a), nx: Math.cos(a), nz: Math.sin(a) })
+    }
+  }
+  path.push({ x: hx, z: -(hz - r), nx: 1, nz: 0 })
+  path.push({ x: hx, z: hz - r, nx: 1, nz: 0 })
+  arc(hx - r, hz - r, 0, Math.PI / 2)
+  path.push({ x: -(hx - r), z: hz, nx: 0, nz: 1 })
+  arc(-(hx - r), hz - r, Math.PI / 2, Math.PI)
+  path.push({ x: -hx, z: -(hz - r), nx: -1, nz: 0 })
+  arc(-(hx - r), -(hz - r), Math.PI, Math.PI * 1.5)
+  path.push({ x: hx - r, z: -hz, nx: 0, nz: -1 })
+  arc(hx - r, -(hz - r), Math.PI * 1.5, Math.PI * 2)
+  return path
+}
+
+function extrudeFootprint(group: THREE.Group, mat: THREE.Material, pts: [number, number][], y0: number, y1: number) {
+  if (pts.length < 3 || y1 - y0 < 1e-5) return
+  const shape = new THREE.Shape()
+  const first = pts[0]
+  if (!first) return
+  shape.moveTo(first[0], first[1])
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i]
+    if (p) shape.lineTo(p[0], p[1])
+  }
+  shape.closePath()
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: y1 - y0, bevelEnabled: false })
+  geo.rotateX(Math.PI / 2)
+  geo.translate(0, y1, 0)
+  const mesh = new THREE.Mesh(geo, mat)
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  group.add(mesh)
+}
+
+function clipRect(
+  pts: [number, number][],
+  x0: number,
+  x1: number,
+  z0: number,
+  z1: number,
+): [number, number][] {
+  const clipEdge = (
+    input: [number, number][],
+    inside: (p: [number, number]) => boolean,
+    at: (a: [number, number], b: [number, number]) => [number, number],
+  ) => {
+    if (input.length === 0) return input
+    const out: [number, number][] = []
+    for (let i = 0; i < input.length; i++) {
+      const s = input[i]
+      const e = input[(i + 1) % input.length]
+      if (!s || !e) continue
+      const si = inside(s)
+      const ei = inside(e)
+      if (si && ei) out.push(e)
+      else if (si && !ei) out.push(at(s, e))
+      else if (!si && ei) {
+        out.push(at(s, e))
+        out.push(e)
+      }
+    }
+    return out
+  }
+  const hitX = (x: number) => (a: [number, number], b: [number, number]): [number, number] => {
+    const t = (x - a[0]) / (b[0] - a[0] || 1e-9)
+    return [x, a[1] + (b[1] - a[1]) * t]
+  }
+  const hitZ = (z: number) => (a: [number, number], b: [number, number]): [number, number] => {
+    const t = (z - a[1]) / (b[1] - a[1] || 1e-9)
+    return [a[0] + (b[0] - a[0]) * t, z]
+  }
+  let p = pts
+  p = clipEdge(p, (q) => q[0] >= x0, hitX(x0))
+  p = clipEdge(p, (q) => q[0] <= x1, hitX(x1))
+  p = clipEdge(p, (q) => q[1] >= z0, hitZ(z0))
+  p = clipEdge(p, (q) => q[1] <= z1, hitZ(z1))
+  return p
+}
+
+function cornerArc(mount: PocketMount): [number, number][] {
+  const tracks = jawOpening(pocketParams('corner'), 'corner')
+  const a = tracks.left[tracks.left.length - 1]
+  const b = tracks.right[tracks.right.length - 1]
+  if (!a || !b) return []
+  const zApex = 0.125
+  const cz = 2 * zApex - 0.5 * (a.z + b.z)
+  const pts: [number, number][] = []
+  const steps = 14
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const u = 1 - t
+    const x = u * u * a.x + t * t * b.x
+    const z = u * u * a.z + 2 * u * t * cz + t * t * b.z
+    const w = localToWorld(mount, x, 0, z)
+    pts.push([w[0], w[2]])
+  }
+  return pts
+}
+
+function cornerWood(mount: PocketMount): [number, number][] {
+  const arc = cornerArc(mount)
+  const a0 = arc[0]
+  const a1 = arc[arc.length - 1]
+  if (!a0 || !a1) return []
+  const sx = Math.sign(mount.x) || 1
+  const sz = Math.sign(mount.z) || 1
+  const xOut = sx * (HALF_L + OAK_SPLIT - 0.02)
+  const zOut = sz * (HALF_W + OAK_SPLIT - 0.02)
+  return [...arc, [xOut, a1[1]], [xOut, zOut], [a0[0], zOut]]
+}
+
+function sideOak(sign: 1 | -1): [number, number][] {
+  const mouth = pocketParams('side').mouthWidth / 2
+  const zIn = sign * (HALF_W + CLOTH_REACH - 0.001)
+  const zBend = sign * (HALF_W + 0.132)
+  const zBack = sign * (HALF_W + 0.148)
+  const zFar = sign * (HALF_W + OAK_SPLIT - 0.002)
+  const r = 0.016
+  const half = HOLE_HALF
+  const pts: [number, number][] = [
+    [-mouth, zIn],
+    [-mouth, zFar],
+    [mouth, zFar],
+    [mouth, zIn],
+    [half, zIn],
+    [half, zBend],
+  ]
+  const steps = 6
+  for (let i = 1; i <= steps; i++) {
+    const a = (i / steps) * (Math.PI / 2)
+    pts.push([half - r + r * Math.cos(a), zBend + sign * r * Math.sin(a)])
+  }
+  pts.push([-(half - r), zBack])
+  for (let i = 1; i <= steps; i++) {
+    const a = (i / steps) * (Math.PI / 2)
+    pts.push([-(half - r) - r * Math.sin(a), zBend + sign * r * Math.cos(a)])
+  }
+  pts.push([-half, zIn])
+  return pts
+}
+
+function jawPath(mount: PocketMount, track: XZ[]): { path: PathPt[]; rail: RailId; cut: number } | null {
+  const lip = track[0]
+  const tee = track[track.length - 1]
+  if (!lip || !tee) return null
+  const lipW = localToWorld(mount, lip.x, 0, lip.z)
+  const rail = attachRail(lipW[0], lipW[2])
+  const [nx, nz] = railOutward(rail)
+  const join =
+    rail === 'n' || rail === 's'
+      ? { x: lipW[0], z: rail === 'n' ? HALF_W : -HALF_W }
+      : { x: rail === 'e' ? HALF_L : -HALF_L, z: lipW[2] }
+  const params = pocketParams(mount.kind)
+  const sign = Math.sign(tee.x || lip.x) || 1
+  const c0 = { x: sign * (params.throatWidth / 2 + params.jawRadius), z: tee.z }
+  const path: PathPt[] = []
+  if (Math.hypot(join.x - lipW[0], join.z - lipW[2]) > 1e-4) path.push({ x: join.x, z: join.z, nx, nz })
+  for (let i = 0; i < track.length; i++) {
+    const p = track[i]
+    if (!p) continue
+    const w = localToWorld(mount, p.x, 0, p.z)
+    let px = nx
+    let pz = nz
+    if (i > 0) {
+      const c0w = localToWorld(mount, c0.x, 0, c0.z)
+      const dx = c0w[0] - w[0]
+      const dz = c0w[2] - w[2]
+      const len = Math.hypot(dx, dz)
+      if (len > 1e-6) {
+        px = dx / len
+        pz = dz / len
+      }
+    }
+    path.push({ x: w[0], z: w[2], nx: px, nz: pz })
+  }
+  return { path, rail, cut: rail === 'n' || rail === 's' ? join.x : join.z }
+}
+
+function addSweep(group: THREE.Group, mat: THREE.Material, path: PathPt[], section: SectionPt[], capStart: boolean, capEnd: boolean) {
+  const pos: number[] = []
+  sweepSection(pos, path, section, capStart, capEnd)
+  addMesh(group, mat, pos)
+}
+
+/** Rails, rounded cabinet, and the six pocket mouths. Physics is unchanged. */
+function addCabinet(root: THREE.Group, mats: TableMaterials) {
   const leather = mats.leather.clone()
   leather.side = THREE.DoubleSide
   leather.transparent = false
   leather.opacity = 1
   leather.depthWrite = true
-  const rubber = mats.cloth.clone()
-  rubber.side = THREE.DoubleSide
-  rubber.transparent = false
-  rubber.opacity = 1
-  rubber.depthWrite = true
-  rubber.polygonOffset = true
-  rubber.polygonOffsetFactor = 1
-  rubber.polygonOffsetUnits = 1
-  const wood = mats.oak.clone()
-  wood.side = THREE.DoubleSide
-  wood.transparent = false
-  wood.opacity = 1
-  wood.depthWrite = true
-
-  const side = pocketParams('side')
-  const nose = side.throatWidth / 2 + side.jawRadius
-  const woodCut = side.throatWidth / 2 + side.rubberThickness
-  const along: Record<RailId, number[]> = { n: [], s: [], e: [], w: [] }
+  const cloth = mats.cloth.clone()
+  cloth.side = THREE.DoubleSide
+  const oak = mats.oak.clone()
+  oak.side = THREE.DoubleSide
+  const clothTop = mats.cloth.clone()
+  clothTop.side = THREE.DoubleSide
+  const nose = noseSection()
+  const cuts: Record<RailId, number[]> = { n: [], s: [], e: [], w: [] }
 
   for (const mount of pocketMounts()) {
     const params = pocketParams(mount.kind)
@@ -300,77 +522,111 @@ function addPocketOpenings(root: THREE.Group, mats: TableMaterials): RailCuts {
       }
     })
     root.add(pocket)
-
     const tracks = jawOpening(params, mount.kind)
-    const rub = params.rubberThickness
-    const throatHalf = params.throatWidth / 2
     for (const track of [tracks.left, tracks.right]) {
-      const lip = track[0]
-      const c1 = track[1]
-      const tee = track[track.length - 1]
-      if (!lip || !c1 || !tee) continue
-      const lipW = localToWorld(mount, lip.x, 0, lip.z)
-      const rail = attachRail(lipW[0], lipW[2])
-      const [ox, oz] = railOutward(rail)
-      const awayX = Math.sign(lipW[0] - mount.x) || 1
-      const awayZ = Math.sign(lipW[2] - mount.z) || 1
-      const step = mount.kind === 'corner' ? 0.036 : 0.012
-      const extW: [number, number] =
-        rail === 'n' || rail === 's'
-          ? [lipW[0] + awayX * step, rail === 'n' ? HALF_W : -HALF_W]
-          : [rail === 'e' ? HALF_L : -HALF_L, lipW[2] + awayZ * step]
-      along[rail].push(rail === 'n' || rail === 's' ? extW[0] : extW[1])
-
-      const sign = Math.sign(tee.x || lip.x) || 1
-      const c0 = { x: sign * (throatHalf + params.jawRadius), z: tee.z }
-      const outward = worldToLocal(mount, mount.x + ox, mount.z + oz)
-      const aim = (p: XZ, i: number) => (i === 0 ? { x: p.x + outward.x, z: p.z + outward.z } : c0)
-      const nosePts = [worldToLocal(mount, extW[0], extW[1]), lip, c1]
-      bandFromLocal(root, rubber, mount, nosePts, aim, 0, rub, 0.002, NOSE_H)
-      bandFromLocal(root, rubber, mount, track.slice(1), () => c0, 0.0004, rub, 0.002, NOSE_H)
-      const woodPts = [nosePts[0] ?? lip, ...track]
-      bandFromLocal(root, wood, mount, woodPts, aim, rub, rub + 0.07, WOOD_BOTTOM, WOOD_TOP)
+      const jaw = jawPath(mount, track)
+      if (!jaw) continue
+      cuts[jaw.rail].push(jaw.cut)
+      addSweep(root, cloth, jaw.path, nose, false, true)
     }
-
-    const zBack = params.depth + (mount.kind === 'side' ? params.drop * Math.tan((params.backTilt * Math.PI) / 180) : 0)
-    const zT = mount.kind === 'side' ? params.jawRadius : (tracks.left[tracks.left.length - 1]?.z ?? params.zCapture)
-    for (const sign of [-1, 1]) {
-      addLocalBox(
-        root,
-        rubber,
-        mount,
-        sign * (throatHalf + 0.0004),
-        sign * (throatHalf + rub),
-        0.002,
-        NOSE_H,
-        zT,
-        zBack,
-      )
-      addLocalBox(
-        root,
-        wood,
-        mount,
-        sign * (throatHalf + rub),
-        sign * (throatHalf + rub + 0.07),
-        WOOD_BOTTOM,
-        WOOD_TOP,
-        zT,
-        zBack + 0.012,
-      )
+    if (mount.kind === 'corner') {
+      const wood = cornerWood(mount)
+      extrudeFootprint(root, oak, wood, BED + WOOD_BOTTOM, BED + WOOD_TOP)
+      const sx = Math.sign(mount.x) || 1
+      const sz = Math.sign(mount.z) || 1
+      const bands = [
+        {
+          x0: sx > 0 ? -2 : sx * (HALF_L + CLOTH_REACH),
+          x1: sx > 0 ? sx * (HALF_L + CLOTH_REACH) : 2,
+          z0: sz * (HALF_W + ROUND_R - 0.002),
+          z1: sz * (HALF_W + CLOTH_REACH),
+        },
+        {
+          x0: sx * (HALF_L + ROUND_R - 0.002),
+          x1: sx * (HALF_L + CLOTH_REACH),
+          z0: sz > 0 ? -2 : sz * (HALF_W + CLOTH_REACH),
+          z1: sz > 0 ? sz * (HALF_W + CLOTH_REACH) : 2,
+        },
+      ]
+      for (const band of bands) {
+        const loX = Math.min(band.x0, band.x1)
+        const hiX = Math.max(band.x0, band.x1)
+        const loZ = Math.min(band.z0, band.z1)
+        const hiZ = Math.max(band.z0, band.z1)
+        extrudeFootprint(root, clothTop, clipRect(wood, loX, hiX, loZ, hiZ), BED + WOOD_TOP - 0.004, BED + WOOD_TOP)
+      }
     }
   }
 
-  return {
-    nose,
-    wood: woodCut,
-    nWest: Math.min(...along.n),
-    nEast: Math.max(...along.n),
-    sWest: Math.min(...along.s),
-    sEast: Math.max(...along.s),
-    eSouth: Math.min(...along.e),
-    eNorth: Math.max(...along.e),
-    wSouth: Math.min(...along.w),
-    wNorth: Math.max(...along.w),
+  const outer: number[] = []
+  sweepSection(outer, roundedRectPath(HALF_L + RAIL, HALF_W + RAIL, V_CORNER), cabinetSection(), false, false)
+  addMesh(root, oak, outer)
+
+  const spans = (rail: RailId): [number, number][] => {
+    const v = [...cuts[rail]].sort((a, b) => a - b)
+    const out: [number, number][] = []
+    for (let i = 0; i + 1 < v.length; i += 2) {
+      const a = v[i]
+      const b = v[i + 1]
+      if (a !== undefined && b !== undefined) out.push([a, b])
+    }
+    return out
+  }
+
+  const yNose = BED + NOSE_H
+  const yUnder = BED + WOOD_TOP - 0.006
+  const yTop = BED + WOOD_TOP + 0.001
+  const yBot = BED + WOOD_BOTTOM
+
+  for (const rail of ['n', 's', 'e', 'w'] as const) {
+    const [nx, nz] = railOutward(rail)
+    for (const [a, b] of spans(rail)) {
+      const lo = Math.min(a, b)
+      const hi = Math.max(a, b)
+      if (hi - lo < 0.02) continue
+      if (rail === 'n' || rail === 's') {
+        const z = rail === 'n' ? HALF_W : -HALF_W
+        addSweep(root, cloth, [
+          { x: lo, z, nx, nz },
+          { x: hi, z, nx, nz },
+        ], nose, true, true)
+        const zRound = z + nz * (ROUND_R - 0.001)
+        const zCloth = z + nz * CLOTH_REACH
+        const zOak = z + nz * (OAK_SPLIT - 0.004)
+        const zLip = z + nz * (LIP_R + 0.001)
+        addBox(root, clothTop, lo, hi, yUnder, yTop, Math.min(zRound, zCloth), Math.max(zRound, zCloth))
+        addBox(root, mats.oak, lo, hi, yBot, yUnder, Math.min(zRound, zCloth), Math.max(zRound, zCloth))
+        addBox(root, mats.oak, lo, hi, yBot, yTop, Math.min(zCloth, zOak), Math.max(zCloth, zOak))
+        addBox(root, mats.oak, lo, hi, yBot, yNose, Math.min(zLip, z + nz * ROUND_R), Math.max(zLip, z + nz * ROUND_R))
+      } else {
+        const x = rail === 'e' ? HALF_L : -HALF_L
+        addSweep(root, cloth, [
+          { x, z: lo, nx, nz },
+          { x, z: hi, nx, nz },
+        ], nose, true, true)
+        const xRound = x + nx * (ROUND_R - 0.001)
+        const xCloth = x + nx * CLOTH_REACH
+        const xOak = x + nx * (OAK_SPLIT - 0.004)
+        const xLip = x + nx * (LIP_R + 0.001)
+        addBox(root, clothTop, Math.min(xRound, xCloth), Math.max(xRound, xCloth), yUnder, yTop, lo, hi)
+        addBox(root, mats.oak, Math.min(xRound, xCloth), Math.max(xRound, xCloth), yBot, yUnder, lo, hi)
+        addBox(root, mats.oak, Math.min(xCloth, xOak), Math.max(xCloth, xOak), yBot, yTop, lo, hi)
+        addBox(root, mats.oak, Math.min(xLip, x + nx * ROUND_R), Math.max(xLip, x + nx * ROUND_R), yBot, yNose, lo, hi)
+      }
+    }
+  }
+
+  const mouth = pocketParams('side').mouthWidth / 2
+  for (const sign of [1, -1] as const) {
+    extrudeFootprint(root, oak, sideOak(sign), yBot, yTop)
+    const zRound = sign * (HALF_W + ROUND_R - 0.001)
+    const zCloth = sign * (HALF_W + CLOTH_REACH)
+    for (const side of [-1, 1] as const) {
+      const x0 = side * HOLE_HALF
+      const x1 = side * mouth
+      addBox(root, clothTop, Math.min(x0, x1), Math.max(x0, x1), yUnder, yTop, Math.min(zRound, zCloth), Math.max(zRound, zCloth))
+      addBox(root, mats.oak, Math.min(x0, x1), Math.max(x0, x1), yBot, yUnder, Math.min(zRound, zCloth), Math.max(zRound, zCloth))
+    }
   }
 }
 
@@ -427,65 +683,15 @@ export function buildTable(mats: TableMaterials) {
   spot.position.set(HALF_L - PLAY_L / 4, BED + 0.0002, 0)
   root.add(spot)
 
-  const y0 = BED + WOOD_BOTTOM
-  const y1 = BED + WOOD_TOP
-  const outerX = HALF_L + RAIL
-  const outerZ = HALF_W + RAIL
-  const rub = pocketParams('side').rubberThickness
-  const shell = 0.07
-  const apronT = 0.04
-  const apronH = 0.16
-  const apronTop = y0 + 0.001
-  const apronBottom = apronTop - apronH
-  const cushY0 = BED + 0.002
-  const cushY1 = BED + NOSE_H
-  const cuts = addPocketOpenings(root, mats)
-  const overlap = 0.004
+  addCabinet(root, mats)
 
-  for (const sz of [1, -1] as const) {
-    const west = (sz === 1 ? cuts.nWest : cuts.sWest) - overlap
-    const east = (sz === 1 ? cuts.nEast : cuts.sEast) + overlap
-    const zShell0 = sz * (outerZ - shell)
-    const zShell1 = sz * outerZ
-    const zInner0 = sz * (HALF_W + rub - 0.001)
-    const zInner1 = sz * (outerZ - shell + 0.001)
-    addBox(root, mats.oak, -outerX, -cuts.wood, y0, y1, zShell0, zShell1)
-    addBox(root, mats.oak, cuts.wood, outerX, y0, y1, zShell0, zShell1)
-    addBox(root, mats.oak, -outerX, west, y0, y1, zInner0, zInner1)
-    addBox(root, mats.oak, west, -cuts.wood, y0, y1, zInner0, zInner1)
-    addBox(root, mats.oak, cuts.wood, east, y0, y1, zInner0, zInner1)
-    addBox(root, mats.oak, east, outerX, y0, y1, zInner0, zInner1)
-    addBox(root, mats.cloth, west, -cuts.nose, cushY0, cushY1, sz * HALF_W, sz * (HALF_W + rub + 0.001))
-    addBox(root, mats.cloth, cuts.nose, east, cushY0, cushY1, sz * HALF_W, sz * (HALF_W + rub + 0.001))
-    addBox(root, mats.oak, west, -cuts.wood, BED + 0.034, y1, sz * (HALF_W + 0.002), zInner0)
-    addBox(root, mats.oak, cuts.wood, east, BED + 0.034, y1, sz * (HALF_W + 0.002), zInner0)
-    const zApron0 = sz * (outerZ - apronT)
-    const zApron1 = sz * outerZ
-    addBox(root, mats.oak, -outerX, -cuts.wood, apronBottom, apronTop, zApron0, zApron1)
-    addBox(root, mats.oak, cuts.wood, outerX, apronBottom, apronTop, zApron0, zApron1)
-  }
-
-  for (const sx of [1, -1] as const) {
-    const south = (sx === 1 ? cuts.eSouth : cuts.wSouth) - overlap
-    const north = (sx === 1 ? cuts.eNorth : cuts.wNorth) + overlap
-    const xShell0 = sx * (outerX - shell)
-    const xShell1 = sx * outerX
-    addBox(root, mats.oak, xShell0, xShell1, y0, y1, -(outerZ - shell - 0.004), outerZ - shell - 0.004)
-    const xInner0 = sx * (HALF_L + rub - 0.001)
-    const xInner1 = sx * (outerX - shell + 0.001)
-    addBox(root, mats.oak, xInner0, xInner1, y0, y1, south, north)
-    addBox(root, mats.cloth, sx * HALF_L, sx * (HALF_L + rub + 0.001), cushY0, cushY1, south, north)
-    addBox(root, mats.oak, sx * (HALF_L + 0.002), xInner0, BED + 0.034, y1, south, north)
-    const xApron0 = sx * (outerX - apronT)
-    const xApron1 = sx * outerX
-    addBox(root, mats.oak, xApron0, xApron1, apronBottom, apronTop, -(outerZ - apronT - 0.001), outerZ - apronT - 0.001)
-  }
-
-  const legTop = apronBottom
-  const footH = 0.04
-  const legGeo = new THREE.CylinderGeometry(0.045, 0.055, legTop - footH, 4)
+  const apronBottom = BED + WOOD_BOTTOM - APRON_H
+  const footH = 0.05
+  const legFlatTop = 0.125
+  const legFlatBot = 0.14
+  const legGeo = new THREE.CylinderGeometry(legFlatTop / Math.SQRT2, legFlatBot / Math.SQRT2, apronBottom - footH, 4)
   legGeo.rotateY(Math.PI / 4)
-  legGeo.translate(0, (legTop - footH) / 2 + footH, 0)
+  legGeo.translate(0, (apronBottom - footH) / 2 + footH, 0)
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
       const leg = new THREE.Mesh(legGeo, mats.oak)
@@ -493,7 +699,7 @@ export function buildTable(mats: TableMaterials) {
       leg.castShadow = true
       leg.receiveShadow = true
       root.add(leg)
-      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.13, footH, 0.13), mats.oak)
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(0.2, footH, 0.2), mats.oak)
       foot.position.set(sx * 1.16, footH / 2, sz * 0.55)
       foot.castShadow = true
       root.add(foot)
@@ -502,7 +708,7 @@ export function buildTable(mats: TableMaterials) {
 
   for (const mark of diamondMarks()) {
     const d = new THREE.Mesh(diamondGeometry(mark.alongX), mats.pearl)
-    d.position.set(mark.x, BED + WOOD_TOP - 0.0011, mark.z)
+    d.position.set(mark.x, BED + WOOD_TOP - 0.0008, mark.z)
     root.add(d)
   }
 
