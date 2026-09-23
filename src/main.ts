@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { createAudio } from './audio.ts'
 import { createBallMeshes } from './balls.ts'
-import { createRoundEnd } from './cinematic.ts'
+import { Cutscene } from './cutscene.ts'
 import { CLOTH_PRESETS, createMaterials, setClothColor } from './materials.ts'
 import {
   allSleeping,
@@ -113,8 +113,8 @@ const balls = createBallMeshes()
 scene.add(balls.group)
 const cue = buildCue()
 scene.add(cue)
-const round = createRoundEnd()
 const audio = createAudio()
+const cutscene = new Cutscene(must<HTMLCanvasElement>('#cutscene'), audio)
 const PLAYERS = ['东泽', '日峰'] as const
 
 const ghost = new THREE.Mesh(
@@ -146,9 +146,6 @@ let power = 0
 let accum = 0
 let sleepT = 0
 let simTime = 0
-let roundT = 0
-let cardOn = false
-let jackpot: '大金' | '小金' | null = null
 const before = new Map<BallId, Ball['state']>()
 let shotLegal: ObjectId = '1'
 let shotUp: ObjectId[] = ['1', '2', '3', '9']
@@ -166,20 +163,11 @@ const swatches = must('#swatches')
 const spinPad = must('#spin')
 const spinDot = must('#spin-dot')
 const toastEl = must('#toast')
-const jackpotEl = must('#jackpot')
-const jackpotWord = must('#jackpot-word')
-const settleEl = must('#settle')
-const settleLine = must('#settle-line')
-const settleWin = must('#settle-win')
-const settleLose = must('#settle-lose')
-const settleNext = must('#settle-next')
+const tavern = must('#tavern')
+const tavernLine = must('#tavern-line')
 const endA = must('#end-a')
 const endB = must('#end-b')
 const again = must<HTMLButtonElement>('#again')
-const rotor = must<SVGSVGElement>('#cylinder-rotor')
-const slots = [...rotor.querySelectorAll<SVGGElement>('.slot')]
-let spinTimer = 0
-const SPIN_MS = 1350
 
 for (const preset of CLOTH_PRESETS) {
   const btn = document.createElement('button')
@@ -332,61 +320,22 @@ function resetSpin() {
   spinDot.style.top = '50%'
 }
 
-function jackpotOf(call: string): '大金' | '小金' | null {
-  if (call.includes('小金')) return '小金'
-  if (call.includes('大金')) return '大金'
-  return null
-}
-
 function closeRound() {
-  window.clearTimeout(spinTimer)
-  settleEl.hidden = true
-  jackpotEl.hidden = true
-  again.hidden = true
-  cardOn = false
-  jackpot = null
-  roundT = 0
+  cutscene.stop()
+  tavern.hidden = true
 }
 
-function layoutCylinder(animate: boolean) {
-  const flags = round.loaded
-  slots.forEach((slot, i) => slot.classList.toggle('loaded', flags[i] === true))
-  const rest = -(round.chamber * 60)
-  rotor.classList.remove('spinning')
-  rotor.style.setProperty('--stop', `${rest}deg`)
-  if (!animate) {
-    rotor.style.transform = `rotate(${rest}deg)`
-    return
-  }
-  rotor.style.transform = ''
-  rotor.style.setProperty('--spin-to', `${-(1080 + round.chamber * 60)}deg`)
-  void rotor.getBoundingClientRect()
-  rotor.classList.add('spinning')
-}
-
-function revealRound(animate = true) {
-  if (match.winner === null || match.loser === null) return
-  const liveRound = round.live
-  const loser = PLAYERS[match.loser]
-  const winner = PLAYERS[match.winner]
-  settleLine.textContent = liveRound ? `实弹！${loser}没能逃过` : `空枪！${loser}逃过一劫`
-  settleWin.textContent = winner
-  settleLose.textContent = loser
-  endA.textContent = String(match.scores[0])
-  endB.textContent = String(match.scores[1])
-  settleNext.textContent = liveRound ? '对局结束' : `下一局 ${loser} 开球`
-  again.hidden = !liveRound
-  jackpotEl.hidden = true
-  settleEl.hidden = false
-  settleEl.dataset.outcome = liveRound ? 'live' : 'dry'
-  cardOn = true
-  layoutCylinder(animate)
-  window.clearTimeout(spinTimer)
-  if (!animate) return
-  spinTimer = window.setTimeout(() => {
-    if (liveRound) audio.live()
-    else audio.click()
-  }, SPIN_MS)
+function continueAfterDry(winner: 0 | 1) {
+  nextRack(match, winner)
+  resetSpin()
+  rackBalls(world)
+  for (const mesh of Object.values(balls.meshes)) mesh.quaternion.identity()
+  dropping.clear()
+  camera.position.set(-1.7, 2.05, 1.9)
+  controls.target.set(0.05, 0.72, 0)
+  mode = 'aim'
+  toast('下一局')
+  syncHud()
 }
 
 function beginShot() {
@@ -436,17 +385,27 @@ function finishShot() {
     cueBall.vx = cueBall.vy = cueBall.vz = 0
   }
   toast(match.lastCall)
-  if (result.rackOver && match.winner !== null) {
+  if (result.rackOver && match.winner !== null && match.loser !== null) {
     mode = 'cine'
-    roundT = 0
-    cardOn = false
-    jackpot = jackpotOf(match.lastCall)
-    round.start()
-    if (jackpot) {
-      jackpotWord.textContent = jackpot
-      jackpotEl.hidden = false
-      settleEl.hidden = true
-    } else revealRound()
+    const winner = match.winner
+    const loser = match.loser
+    cutscene.play({
+      winnerName: PLAYERS[winner],
+      loserName: PLAYERS[loser],
+      onDone(dead) {
+        if (dead) {
+          match.gameOver = true
+          mode = 'end'
+          endA.textContent = String(match.scores[0])
+          endB.textContent = String(match.scores[1])
+          tavernLine.textContent = `${PLAYERS[winner]} 活着离开酒馆`
+          tavern.hidden = false
+          syncHud()
+          return
+        }
+        continueAfterDry(winner)
+      },
+    })
   } else if (match.ballInHand) mode = 'bih'
   else mode = 'aim'
   syncHud()
@@ -487,13 +446,9 @@ window.addEventListener('resize', layout)
 layout()
 
 const settleKind = new URLSearchParams(location.search).get('settle')
-if (settleKind === 'dry' || settleKind === 'live') {
-  round.show(settleKind)
-  match.winner = 0
-  match.loser = 1
-  match.scores[0] = 4
-  match.scores[1] = 0
-  revealRound(false)
+if (settleKind === 'cigar' || settleKind === 'spin' || settleKind === 'dry' || settleKind === 'live') {
+  mode = 'cine'
+  cutscene.show(settleKind)
 }
 
 let last = performance.now()
@@ -524,26 +479,7 @@ function frame(now: number) {
     else sleepT = 0
     if (sleepT > 0.18 || simTime > 12) finishShot()
   }
-  if (mode === 'cine') {
-    roundT += dt
-    if (jackpot && !cardOn && roundT >= 2.1) revealRound()
-    if (cardOn && round.live) {
-      match.gameOver = true
-      mode = 'end'
-    } else if (cardOn && !round.live && roundT >= (jackpot ? 5.3 : 3.2) && match.loser !== null) {
-      const breaker = match.loser
-      closeRound()
-      nextRack(match, breaker)
-      resetSpin()
-      rackBalls(world)
-      for (const mesh of Object.values(balls.meshes)) mesh.quaternion.identity()
-      dropping.clear()
-      camera.position.set(-1.7, 2.05, 1.9)
-      controls.target.set(0.05, 0.72, 0)
-      mode = 'aim'
-      toast('下一局')
-    }
-  }
+  if (mode === 'cine') cutscene.update(dt)
 
   for (const b of world.balls) {
     const mesh = balls.meshes[b.id]

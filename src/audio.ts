@@ -122,6 +122,42 @@ export function createAudio() {
     src.stop(t + 0.18)
   }
 
+  function spinCylinder() {
+    const ac = context()
+    const t = ac.currentTime
+    if (noise) {
+      const src = ac.createBufferSource()
+      src.buffer = noise
+      src.loop = true
+      const filter = ac.createBiquadFilter()
+      filter.type = 'bandpass'
+      filter.frequency.setValueAtTime(400, t)
+      filter.frequency.exponentialRampToValueAtTime(2200, t + 0.7)
+      filter.Q.value = 6
+      const g = ac.createGain()
+      g.gain.setValueAtTime(0.08, t)
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.72)
+      src.connect(filter)
+      filter.connect(g)
+      g.connect(ac.destination)
+      src.start(t)
+      src.stop(t + 0.75)
+    }
+    for (let i = 0; i < 6; i++) {
+      const tick = ac.createOscillator()
+      tick.type = 'square'
+      const when = t + i * 0.09
+      tick.frequency.setValueAtTime(1800 - i * 80, when)
+      const g = ac.createGain()
+      g.gain.setValueAtTime(0.04, when)
+      g.gain.exponentialRampToValueAtTime(0.001, when + 0.03)
+      tick.connect(g)
+      g.connect(ac.destination)
+      tick.start(when)
+      tick.stop(when + 0.04)
+    }
+  }
+
   function allow(kind: 'ball' | 'cushion') {
     const now = performance.now()
     if (now - lastHit[kind] < 32) return false
@@ -157,6 +193,11 @@ export function createAudio() {
     },
     live() {
       gunshot()
+    },
+    spinCylinder,
+    gunshot,
+    clickEmpty() {
+      dryClick()
     },
   }
 }

@@ -54,115 +54,11 @@
       <p id="help">移动瞄准，按住蓄力，松手出杆。右键转动视角。</p>
     </div>
     <div id="toast"></div>
-    <div id="jackpot" hidden><span id="jackpot-word">大金</span></div>
-    <section id="settle" hidden>
-      <p id="settle-line"></p>
-      <div class="faces">
-        <figure class="who">
-          <svg class="figure" viewBox="0 0 190 250" aria-hidden="true">
-            <ellipse cx="90" cy="238" rx="48" ry="7" fill="#000" opacity="0.3" />
-            <rect x="58" y="214" width="28" height="12" rx="3" fill="#121212" />
-            <rect x="94" y="214" width="28" height="12" rx="3" fill="#121212" />
-            <rect x="62" y="166" width="22" height="52" rx="6" fill="#1b2433" />
-            <rect x="96" y="166" width="22" height="52" rx="6" fill="#141b28" />
-            <path d="M46 108h88l12 66H36z" fill="#31425c" />
-            <path d="M78 112l12 42 12-42z" fill="#f4efe4" />
-            <path d="M48 118c-18 22-12 52-2 62" stroke="#31425c" stroke-width="16" fill="none" stroke-linecap="round" />
-            <circle cx="46" cy="182" r="8" fill="#e8c4a4" />
-            <path d="M132 116c22 10 28 28 18 40" stroke="#31425c" stroke-width="16" fill="none" stroke-linecap="round" />
-            <circle cx="146" cy="158" r="8" fill="#e8c4a4" />
-            <rect x="78" y="92" width="24" height="18" rx="5" fill="#e8c4a4" />
-            <circle cx="90" cy="66" r="32" fill="#f0c9a8" />
-            <path d="M58 68c2-32 62-34 66 0-8-18-22-26-34-26S68 50 58 68z" fill="#2a211c" />
-            <ellipse cx="60" cy="74" rx="6" ry="9" fill="#e0b496" />
-            <path d="M98 58q12-5 20 2" stroke="#2a211c" stroke-width="2.4" fill="none" stroke-linecap="round" />
-            <circle cx="112" cy="68" r="3.4" fill="#1a120e" />
-            <path d="M124 74q8 8 0 14" stroke="#c48b6a" stroke-width="2" fill="none" stroke-linecap="round" />
-            <path d="M100 88q12 10 24 0" stroke="#a45b49" stroke-width="2.4" fill="none" stroke-linecap="round" />
-            <g transform="rotate(-12 124 90)">
-              <rect x="116" y="86" width="36" height="8" rx="2" fill="#6b3a22" />
-              <rect x="148" y="86" width="8" height="8" rx="1.5" fill="#ff6a1a" />
-            </g>
-            <circle cx="162" cy="62" r="8" fill="#f7f3ec" opacity="0.62" />
-            <circle cx="170" cy="40" r="12" fill="#f7f3ec" opacity="0.42" />
-            <circle cx="158" cy="20" r="8" fill="#f7f3ec" opacity="0.26" />
-          </svg>
-          <figcaption id="settle-win"></figcaption>
-        </figure>
-        <div class="pair">
-          <figure class="who">
-            <svg class="figure" viewBox="0 0 240 250" aria-hidden="true">
-              <ellipse cx="86" cy="238" rx="46" ry="7" fill="#000" opacity="0.3" />
-              <rect x="52" y="214" width="28" height="12" rx="3" fill="#121212" />
-              <rect x="88" y="214" width="28" height="12" rx="3" fill="#121212" />
-              <rect x="56" y="166" width="22" height="52" rx="6" fill="#2c241e" />
-              <rect x="90" y="166" width="22" height="52" rx="6" fill="#241e1a" />
-              <path d="M42 108h88l10 66H34z" fill="#4a342c" />
-              <path d="M74 112l12 40 12-40z" fill="#f4efe4" />
-              <path d="M44 120c-16 20-10 48-2 58" stroke="#4a342c" stroke-width="16" fill="none" stroke-linecap="round" />
-              <circle cx="42" cy="180" r="8" fill="#e8c4a4" />
-              <path d="M120 126c22 14 48 6 36-22" stroke="#4a342c" stroke-width="16" fill="none" stroke-linecap="round" />
-              <rect x="72" y="92" width="24" height="18" rx="5" fill="#e8c4a4" />
-              <circle cx="84" cy="66" r="32" fill="#f0c9a8" />
-              <path d="M52 68c2-32 62-34 66 0-8-18-22-26-34-26S62 50 52 68z" fill="#2a211c" />
-              <ellipse cx="54" cy="74" rx="6" ry="9" fill="#e0b496" />
-              <path d="M92 58q12-4 18 3" stroke="#2a211c" stroke-width="2.4" fill="none" stroke-linecap="round" />
-              <circle cx="104" cy="68" r="3.4" fill="#1a120e" />
-              <path d="M116 76q6 6-1 12" stroke="#c48b6a" stroke-width="2" fill="none" stroke-linecap="round" />
-              <path d="M96 90h18" stroke="#a45b49" stroke-width="2.4" stroke-linecap="round" />
-              <rect x="116" y="59" width="44" height="14" rx="2" fill="#d7dfe6" />
-              <rect x="116" y="62" width="5" height="8" rx="1" fill="#14181c" />
-              <circle cx="156" cy="66" r="13" fill="#9099a1" />
-              <circle cx="156" cy="66" r="3.8" fill="#161a1e" />
-              <path d="M150 76l12 28-16 6-10-26z" fill="#3a2618" />
-              <path d="M164 58l3-11 8 2-2 9z" fill="#a3abb3" />
-              <circle cx="160" cy="104" r="8" fill="#e8c4a4" />
-            </svg>
-            <figcaption id="settle-lose"></figcaption>
-          </figure>
-          <div class="wheel" id="cylinder">
-            <span class="pin" aria-hidden="true"></span>
-            <svg id="cylinder-rotor" viewBox="0 0 160 160" aria-hidden="true">
-              <circle cx="80" cy="80" r="74" fill="#aeb6be" />
-              <circle cx="80" cy="80" r="66" fill="#7c868f" />
-              <circle cx="80" cy="80" r="16" fill="#3c444b" />
-              <g class="slot" data-i="0">
-                <circle class="bore" cx="80" cy="34" r="15" />
-                <circle class="round" cx="80" cy="34" r="10" />
-                <circle class="primer" cx="80" cy="34" r="3.2" />
-              </g>
-              <g class="slot" data-i="1">
-                <circle class="bore" cx="120" cy="57" r="15" />
-                <circle class="round" cx="120" cy="57" r="10" />
-                <circle class="primer" cx="120" cy="57" r="3.2" />
-              </g>
-              <g class="slot" data-i="2">
-                <circle class="bore" cx="120" cy="103" r="15" />
-                <circle class="round" cx="120" cy="103" r="10" />
-                <circle class="primer" cx="120" cy="103" r="3.2" />
-              </g>
-              <g class="slot" data-i="3">
-                <circle class="bore" cx="80" cy="126" r="15" />
-                <circle class="round" cx="80" cy="126" r="10" />
-                <circle class="primer" cx="80" cy="126" r="3.2" />
-              </g>
-              <g class="slot" data-i="4">
-                <circle class="bore" cx="40" cy="103" r="15" />
-                <circle class="round" cx="40" cy="103" r="10" />
-                <circle class="primer" cx="40" cy="103" r="3.2" />
-              </g>
-              <g class="slot" data-i="5">
-                <circle class="bore" cx="40" cy="57" r="15" />
-                <circle class="round" cx="40" cy="57" r="10" />
-                <circle class="primer" cx="40" cy="57" r="3.2" />
-              </g>
-            </svg>
-          </div>
-        </div>
-      </div>
+    <canvas id="cutscene"></canvas>
+    <section id="tavern" hidden>
+      <p id="tavern-line"></p>
       <p class="totals">东泽 <strong id="end-a">0</strong> · 日峰 <strong id="end-b">0</strong></p>
-      <p id="settle-next"></p>
-      <button id="again" type="button" hidden>再来一局</button>
+      <button id="again" type="button">再来一局</button>
     </section>
     <script type="module" src="/src/main.ts"></script>
   </body>

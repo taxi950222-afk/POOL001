@@ -233,6 +233,41 @@ button:not(:disabled):hover { background: rgba(228, 201, 138, 0.12); }
 
 #toast.show { opacity: 1; }
 
+#cutscene {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#tavern {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(8, 5, 3, 0.92);
+  color: #f0d9a8;
+  text-align: center;
+}
+
+#tavern[hidden] { display: none; }
+
+#tavern-line {
+  margin: 0;
+  font-size: clamp(36px, 5vw, 64px);
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #f0d9a8;
+}
+
+#tavern #again { font-size: 22px; padding: 12px 28px; }
+
 #jackpot {
   position: fixed;
   inset: 0;
