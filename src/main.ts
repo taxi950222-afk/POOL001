@@ -176,6 +176,10 @@ const settleNext = must('#settle-next')
 const endA = must('#end-a')
 const endB = must('#end-b')
 const again = must<HTMLButtonElement>('#again')
+const rotor = must<SVGSVGElement>('#cylinder-rotor')
+const slots = [...rotor.querySelectorAll<SVGGElement>('.slot')]
+let spinTimer = 0
+const SPIN_MS = 1350
 
 for (const preset of CLOTH_PRESETS) {
   const btn = document.createElement('button')
@@ -335,6 +339,7 @@ function jackpotOf(call: string): '大金' | '小金' | null {
 }
 
 function closeRound() {
+  window.clearTimeout(spinTimer)
   settleEl.hidden = true
   jackpotEl.hidden = true
   again.hidden = true
@@ -343,23 +348,45 @@ function closeRound() {
   roundT = 0
 }
 
-function revealRound() {
+function layoutCylinder(animate: boolean) {
+  const flags = round.loaded
+  slots.forEach((slot, i) => slot.classList.toggle('loaded', flags[i] === true))
+  const rest = -(round.chamber * 60)
+  rotor.classList.remove('spinning')
+  rotor.style.setProperty('--stop', `${rest}deg`)
+  if (!animate) {
+    rotor.style.transform = `rotate(${rest}deg)`
+    return
+  }
+  rotor.style.transform = ''
+  rotor.style.setProperty('--spin-to', `${-(1080 + round.chamber * 60)}deg`)
+  void rotor.getBoundingClientRect()
+  rotor.classList.add('spinning')
+}
+
+function revealRound(animate = true) {
   if (match.winner === null || match.loser === null) return
   const liveRound = round.live
   const loser = PLAYERS[match.loser]
   const winner = PLAYERS[match.winner]
   settleLine.textContent = liveRound ? `实弹！${loser}没能逃过` : `空枪！${loser}逃过一劫`
-  settleWin.textContent = `${winner} 抽烟`
-  settleLose.textContent = `${loser} 对枪`
+  settleWin.textContent = winner
+  settleLose.textContent = loser
   endA.textContent = String(match.scores[0])
   endB.textContent = String(match.scores[1])
   settleNext.textContent = liveRound ? '对局结束' : `下一局 ${loser} 开球`
   again.hidden = !liveRound
   jackpotEl.hidden = true
   settleEl.hidden = false
+  settleEl.dataset.outcome = liveRound ? 'live' : 'dry'
   cardOn = true
-  if (liveRound) audio.live()
-  else audio.click()
+  layoutCylinder(animate)
+  window.clearTimeout(spinTimer)
+  if (!animate) return
+  spinTimer = window.setTimeout(() => {
+    if (liveRound) audio.live()
+    else audio.click()
+  }, SPIN_MS)
 }
 
 function beginShot() {
@@ -458,6 +485,16 @@ function layout() {
 
 window.addEventListener('resize', layout)
 layout()
+
+const settleKind = new URLSearchParams(location.search).get('settle')
+if (settleKind === 'dry' || settleKind === 'live') {
+  round.show(settleKind)
+  match.winner = 0
+  match.loser = 1
+  match.scores[0] = 4
+  match.scores[1] = 0
+  revealRound(false)
+}
 
 let last = performance.now()
 function frame(now: number) {

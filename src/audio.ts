@@ -50,6 +50,78 @@ export function createAudio() {
     src.stop(t + dur + 0.02)
   }
 
+  function dryClick() {
+    const ac = context()
+    const t = ac.currentTime
+    const osc = ac.createOscillator()
+    osc.type = 'square'
+    osc.frequency.setValueAtTime(2800, t)
+    osc.frequency.exponentialRampToValueAtTime(740, t + 0.028)
+    const g = ac.createGain()
+    g.gain.setValueAtTime(0.11, t)
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.04)
+    osc.connect(g)
+    g.connect(ac.destination)
+    osc.start(t)
+    osc.stop(t + 0.06)
+    if (!noise) return
+    const src = ac.createBufferSource()
+    src.buffer = noise
+    const filter = ac.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.value = 4800
+    filter.Q.value = 3.2
+    const ng = ac.createGain()
+    ng.gain.setValueAtTime(0.05, t)
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.02)
+    src.connect(filter)
+    filter.connect(ng)
+    ng.connect(ac.destination)
+    src.start(t)
+    src.stop(t + 0.04)
+  }
+
+  function gunshot() {
+    const ac = context()
+    const t = ac.currentTime
+    const body = ac.createOscillator()
+    body.type = 'sine'
+    body.frequency.setValueAtTime(150, t)
+    body.frequency.exponentialRampToValueAtTime(38, t + 0.26)
+    const bg = ac.createGain()
+    bg.gain.setValueAtTime(0.52, t)
+    bg.gain.exponentialRampToValueAtTime(0.001, t + 0.3)
+    body.connect(bg)
+    bg.connect(ac.destination)
+    body.start(t)
+    body.stop(t + 0.34)
+    const crack = ac.createOscillator()
+    crack.type = 'triangle'
+    crack.frequency.setValueAtTime(680, t)
+    crack.frequency.exponentialRampToValueAtTime(120, t + 0.07)
+    const cg = ac.createGain()
+    cg.gain.setValueAtTime(0.16, t)
+    cg.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
+    crack.connect(cg)
+    cg.connect(ac.destination)
+    crack.start(t)
+    crack.stop(t + 0.1)
+    if (!noise) return
+    const src = ac.createBufferSource()
+    src.buffer = noise
+    const filter = ac.createBiquadFilter()
+    filter.type = 'highpass'
+    filter.frequency.value = 780
+    const ng = ac.createGain()
+    ng.gain.setValueAtTime(0.7, t)
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.15)
+    src.connect(filter)
+    filter.connect(ng)
+    ng.connect(ac.destination)
+    src.start(t)
+    src.stop(t + 0.18)
+  }
+
   function allow(kind: 'ball' | 'cushion') {
     const now = performance.now()
     if (now - lastHit[kind] < 32) return false
@@ -81,10 +153,10 @@ export function createAudio() {
       burst(140, 0.18, 'sine', level(speed, 0.05, 0.04, 0.3), 360, 0.7)
     },
     click() {
-      burst(2400, 0.04, 'square', 0.08, 3000, 2)
+      dryClick()
     },
     live() {
-      burst(90, 0.18, 'sine', 0.2, 240, 0.5)
+      gunshot()
     },
   }
 }

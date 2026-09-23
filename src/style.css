@@ -282,20 +282,69 @@ button:not(:disabled):hover { background: rgba(228, 201, 138, 0.12); }
 
 .faces {
   display: flex;
-  gap: 36px;
+  gap: 48px;
   align-items: flex-end;
   justify-content: center;
   margin-bottom: 8px;
 }
 
+.pair {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
 .faces figure { margin: 0; }
 
-.prop { width: min(200px, 34vw); height: auto; display: block; }
+.figure { width: min(230px, 28vw); height: auto; display: block; }
+
+.wheel {
+  position: relative;
+  width: min(196px, 24vw);
+  flex: none;
+  margin-bottom: 28px;
+}
+
+.pin {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  top: -2px;
+  width: 16px;
+  height: 20px;
+  transform: translateX(-50%);
+  background: #ffe08a;
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+}
+
+#cylinder-rotor {
+  width: 100%;
+  height: auto;
+  display: block;
+  transform-origin: 50% 50%;
+  transform: rotate(var(--stop, 0deg));
+}
+
+#cylinder-rotor.spinning {
+  animation: cylinder-spin 1.35s cubic-bezier(0.1, 0.7, 0.08, 1) forwards;
+}
+
+@keyframes cylinder-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(var(--spin-to, -1080deg)); }
+}
+
+#cylinder-rotor .bore { fill: #14181c; }
+#cylinder-rotor .round { fill: #e0c27a; opacity: 0; }
+#cylinder-rotor .primer { fill: #8a6230; opacity: 0; }
+#cylinder-rotor .slot.loaded .round,
+#cylinder-rotor .slot.loaded .primer { opacity: 1; }
 
 .faces figcaption {
   margin-top: 8px;
-  font-size: clamp(22px, 3vw, 32px);
+  font-size: clamp(26px, 3vw, 36px);
   font-weight: 800;
+  color: var(--brass);
 }
 
 .totals {
@@ -334,5 +383,7 @@ button:not(:disabled):hover { background: rgba(228, 201, 138, 0.12); }
   #spin-wrap { bottom: 8px; right: 8px; width: 148px; }
   #spin { width: 112px; height: 112px; }
   #help { display: none; }
-  .faces { gap: 16px; }
+  .faces { gap: 16px; flex-wrap: wrap; }
+  .figure { width: min(150px, 40vw); }
+  .wheel { width: min(120px, 32vw); margin-bottom: 12px; }
 }
