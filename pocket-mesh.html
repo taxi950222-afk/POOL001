@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>袋口网格</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #121411;
+        color: #e4dfd6;
+        font: 15px/1.4 sans-serif;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        padding: 14px 18px;
+        pointer-events: none;
+      }
+      button {
+        pointer-events: auto;
+        margin-left: auto;
+        background: #2a2d26;
+        color: #f4f1ea;
+        border: 1px solid #8d9284;
+        padding: 6px 14px;
+        font: inherit;
+        cursor: pointer;
+      }
+      button[aria-pressed='true'] {
+        background: #e4dfd6;
+        color: #1a1c17;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <span>左 · 角袋</span>
+      <span>右 · 中袋 · 后壁 12°</span>
+      <button id="wire" type="button" aria-pressed="true">线框</button>
+    </header>
+    <script type="module" src="/src/pocket/mesh-view.ts"></script>
+  </body>
+</html>
