@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>四球追分</title>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="fade"></div>
+    <header id="hud">
+      <div class="brand">
+        <p class="kicker">中式四球</p>
+        <h1>追分</h1>
+        <p id="turn">甲 开球</p>
+        <p id="call">开球</p>
+      </div>
+      <div class="scores">
+        <div><span>甲</span><strong id="score-a">0</strong></div>
+        <div><span>乙</span><strong id="score-b">0</strong></div>
+      </div>
+      <ul class="legend">
+        <li>犯规 <b>1</b></li>
+        <li>黄金九 <b>4</b></li>
+        <li>大金 <b>10</b></li>
+        <li>小金 <b>7</b></li>
+        <li>普胜 <b>4</b></li>
+        <li>让杆双倍 <b>8 / 14 / 20</b></li>
+      </ul>
+      <div class="row">
+        <button id="pass" type="button" disabled>让杆</button>
+        <button id="reball" type="button" hidden>重摆母球</button>
+      </div>
+      <label class="cloth">
+        台呢
+        <input id="cloth" type="color" value="#127a3e" aria-label="台呢颜色" />
+      </label>
+      <div id="swatches"></div>
+    </header>
+    <div id="spin-wrap">
+      <p>击点</p>
+      <div id="spin" role="slider" aria-label="母球击点">
+        <span id="spin-dot"></span>
+      </div>
+      <p class="hint">高杆 · 缩杆 · 塞 · 斯登</p>
+    </div>
+    <div id="power-wrap">
+      <div id="power"><div id="power-fill"></div></div>
+      <p id="help">移动瞄准，按住蓄力，松手出杆。右键转动视角。</p>
+    </div>
+    <div id="toast"></div>
+    <div id="banner"></div>
+    <section id="end" hidden>
+      <p class="kicker">对局结束</p>
+      <h2>结算</h2>
+      <p>甲 <strong id="end-a">0</strong></p>
+      <p>乙 <strong id="end-b">0</strong></p>
+      <button id="again" type="button">再来一局</button>
+    </section>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
