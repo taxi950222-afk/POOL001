@@ -1,4 +1,14 @@
 import {
+  ccdPlan,
+  clearPocketTrack,
+  integratePocketed,
+  legacyJawReplaced,
+  notePocketBlock,
+  overPocketMouth,
+  pocketContacts,
+  tryPocket,
+} from './pocket/colliders.ts'
+import {
   BED,
   HALF_L,
   HALF_W,
@@ -93,6 +103,7 @@ export function rackBalls(world: World) {
     b.y = BED + R
     zero(b)
     b.state = 'live'
+    clearPocketTrack(b)
   }
   world.firstContact = null
   world.nineLast = null
@@ -116,6 +127,7 @@ export function placeCue(world: World, x: number, z: number): boolean {
   cue.y = BED + R
   zero(cue)
   cue.state = 'live'
+  clearPocketTrack(cue)
   return true
 }
 
@@ -134,6 +146,7 @@ export function spotObject(world: World, id: ObjectId) {
     b.y = BED + R
     zero(b)
     b.state = 'live'
+    clearPocketTrack(b)
     return
   }
 }
@@ -197,6 +210,10 @@ export function strike(
 }
 
 function cloth(b: Ball, dt: number) {
+  if (overPocketMouth(b.x, b.y, b.z)) {
+    b.vy -= G * dt
+    return
+  }
   const grounded = b.y <= BED + R + 0.006 && b.vy < 0.45
   if (!grounded) {
     b.vy -= G * dt
@@ -353,9 +370,49 @@ function bounce(
   }
 }
 
+function bounceFull(
+  world: World,
+  b: Ball,
+  nx: number,
+  ny: number,
+  nz: number,
+  events: SimEvent[],
+  e: number,
+) {
+  const rx = -nx * R
+  const ry = -ny * R
+  const rz = -nz * R
+  const vc = contactVel(b, rx, ry, rz)
+  const un = vc.x * nx + vc.y * ny + vc.z * nz
+  if (un >= -0.01) return
+  const jn = -(1 + e) * un * M
+  applyImpulse(b, nx * jn, ny * jn, nz * jn, rx, ry, rz)
+  const vc2 = contactVel(b, rx, ry, rz)
+  const un2 = vc2.x * nx + vc2.y * ny + vc2.z * nz
+  let tx = vc2.x - un2 * nx
+  let ty = vc2.y - un2 * ny
+  let tz = vc2.z - un2 * nz
+  const tmag = Math.hypot(tx, ty, tz)
+  if (tmag > 1e-5) {
+    let jtx = (-tx * M) / 3.5
+    let jty = (-ty * M) / 3.5
+    let jtz = (-tz * M) / 3.5
+    const jm = Math.hypot(jtx, jty, jtz)
+    const cap = TUNE.muCush * Math.abs(jn)
+    if (jm > cap) {
+      const s = cap / jm
+      jtx *= s
+      jty *= s
+      jtz *= s
+    }
+    applyImpulse(b, jtx, jty, jtz, rx, ry, rz)
+  }
+  if (e > 0 && b.id === 'cue' && world.firstContact === null) world.firstContact = 'cushion'
+  if (e > 0 && -un > 0.15) events.push({ t: 'cushion', speed: -un })
+}
+
 function collideCushions(world: World, b: Ball, events: SimEvent[]) {
   if (b.state !== 'live' || clearsRail(b)) return
-  if (captured(b)) return
   for (const s of HW.segs) {
     const abx = s.bx - s.ax
     const abz = s.bz - s.az
@@ -375,6 +432,7 @@ function collideCushions(world: World, b: Ball, events: SimEvent[]) {
     bounce(world, b, nx, nz, events)
   }
   for (const j of HW.jaws) {
+    if (legacyJawReplaced(j.x, j.z)) continue
     const dx = b.x - j.x
     const dz = b.z - j.z
     const d = Math.hypot(dx, dz)
@@ -386,30 +444,21 @@ function collideCushions(world: World, b: Ball, events: SimEvent[]) {
     b.z += nz * (min - d)
     bounce(world, b, nx, nz, events)
   }
-}
-
-function captured(b: Ball): PocketHit | null {
-  for (const p of HW.pockets) {
-    if (Math.hypot(b.x - p.x, b.z - p.z) < p.capture) return p
+  for (let iter = 0; iter < 4; iter++) {
+    const contacts = pocketContacts(b.x, b.y, b.z)
+    const c = contacts[0]
+    if (!c || c.pen < 1e-6) break
+    b.x += c.nx * c.pen
+    b.y += c.ny * c.pen
+    b.z += c.nz * c.pen
+    bounceFull(world, b, c.nx, c.ny, c.nz, events, c.inelastic ? 0 : TUNE.eCush)
+    if (c.blocksPocket) notePocketBlock(b)
   }
-  return null
-}
-
-interface PocketHit {
-  x: number
-  z: number
-  capture: number
 }
 
 function pocketsAndOff(_world: World, b: Ball, events: SimEvent[]) {
   if (b.state !== 'live') return
-  if (b.y < BED + 0.08 && captured(b)) {
-    const speed = Math.hypot(b.vx, b.vy, b.vz)
-    b.state = 'pocket'
-    b.vx = b.vy = b.vz = 0
-    events.push({ t: 'pocket', id: b.id, speed })
-    return
-  }
+  if (overPocketMouth(b.x, b.y, b.z)) return
   const outside =
     Math.abs(b.x) > HALF_L + 0.015 || Math.abs(b.z) > HALF_W + 0.015
   const far =
@@ -425,13 +474,30 @@ export function step(world: World, dt: number): SimEvent[] {
   const events: SimEvent[] = []
   const live = world.balls.filter((b) => b.state === 'live')
   for (const b of live) cloth(b, dt)
+  let substeps = 1
   for (const b of live) {
-    b.x += b.vx * dt
-    b.y += b.vy * dt
-    b.z += b.vz * dt
-    if (b.y < BED + R) {
-      b.y = BED + R
-      if (b.vy < 0) b.vy = 0
+    const plan = ccdPlan(Math.hypot(b.vx, b.vy, b.vz), dt)
+    if (plan.scale < 1) {
+      b.vx *= plan.scale
+      b.vy *= plan.scale
+      b.vz *= plan.scale
+    }
+    if (plan.n > substeps) substeps = plan.n
+  }
+  const subDt = dt / substeps
+  for (let s = 0; s < substeps; s++) {
+    for (const b of live) {
+      if (b.state !== 'live') continue
+      b.x += b.vx * subDt
+      b.y += b.vy * subDt
+      b.z += b.vz * subDt
+      if (b.y < BED + R && !overPocketMouth(b.x, b.y, b.z)) {
+        b.y = BED + R
+        if (b.vy < 0) b.vy = 0
+      }
+      collideCushions(world, b, events)
+      const pocketSpeed = tryPocket(b)
+      if (pocketSpeed !== null) events.push({ t: 'pocket', id: b.id, speed: pocketSpeed })
     }
   }
   for (let k = 0; k < 8; k++) {
@@ -474,7 +540,13 @@ export function step(world: World, dt: number): SimEvent[] {
     for (const p of pending) applyImpulse(p.b, p.jx, p.jy, p.jz, p.rx, p.ry, p.rz)
     for (const b of live) collideCushions(world, b, events)
   }
-  for (const b of live) pocketsAndOff(world, b, events)
+  for (const b of live) {
+    if (b.state !== 'live') continue
+    const pocketSpeed = tryPocket(b)
+    if (pocketSpeed !== null) events.push({ t: 'pocket', id: b.id, speed: pocketSpeed })
+    pocketsAndOff(world, b, events)
+  }
+  for (const b of world.balls) integratePocketed(b, dt)
   for (const b of world.balls) {
     if (b.state !== 'live') continue
     const sp = Math.hypot(b.vx, b.vy, b.vz)
