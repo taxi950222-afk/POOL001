@@ -32,7 +32,7 @@ Rails and cabinet are white oak. Pockets are gray-white cowhide. A three-shade l
 
 ## How to play
 
-甲 breaks. Move the pointer to aim. The cue-ball diagram sets the hit point: high is follow (高杆), low is draw (缩杆), offset is sidespin (塞), center is stun (斯登). Hold to charge the power bar. It fills, then falls. Release to shoot. A tiny charge cancels. Right-drag orbits the camera.
+东泽 breaks. 日峰 is the other player. Move the pointer to aim. The cue-ball diagram sets the hit point: high is follow (高杆), low is draw (缩杆), offset is sidespin (塞), center is stun (斯登). Hold to charge the power bar. It fills, then falls. Release to shoot. A tiny charge cancels. Right-drag orbits the camera.
 
 Only balls 1, 2, 3, and 9 are on the table, plus the cue ball. The 1 sits on the foot spot, the 9 touches it, and 2 and 3 sit on the sides. Hit the lowest ball still up (1, then 2, then 3, then 9). Scores add up across racks.
 
@@ -43,7 +43,7 @@ Only balls 1, 2, 3, and 9 are on the table, plus the cue ball. The 1 sits on the
 - 普胜, 4 points. Any other legal 9. Also a combination 9 that is not 黄金九. If the 9 is pocketed by a combination while ball-in-hand, the shooter loses the rack and the opponent scores 普胜 4.
 - 让杆. Offered when both extreme edges of the legal ball are blocked. Passing is not allowed in ball-in-hand. If the receiver then runs out, the score doubles: 普胜 8, 小金 14, 大金 20. A foul by the receiver is still 1 point and ball-in-hand for the passer.
 
-After a rack the winner smokes a cigar. The loser faces a revolver with 3 live chambers out of 6. A dry click and that loser breaks the next rack. A live round ends the match on the settlement screen. 再来一局 starts over.
+After a rack a flat screen shows the result. The winner's side has a cigar. The loser's side has a revolver with 3 live chambers out of 6. A dry click reads 空枪 and that loser breaks the next rack. A live round reads 实弹 and ends the match on that same screen. 大金 and 小金 flash a full-screen banner first. 再来一局 starts over.
 
 ## Roll distance
 
