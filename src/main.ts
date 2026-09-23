@@ -64,16 +64,19 @@ controls.enablePan = false
 controls.mouseButtons.LEFT = -1 as unknown as THREE.MOUSE
 controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE
 const shot = new URLSearchParams(location.search).get('shot')
-const shots: Record<string, { pos: [number, number, number]; target: [number, number, number]; polar?: number }> = {
+const shots: Record<string, { pos: [number, number, number]; target: [number, number, number]; polar?: number; min?: number }> = {
   side: { pos: [0.05, 1.02, 2.45], target: [0.05, 0.7, 0] },
   corner: { pos: [2.05, 1.15, 1.7], target: [0.2, 0.68, 0.05] },
   end: { pos: [2.65, 1.02, 0.02], target: [0, 0.7, 0] },
   under: { pos: [0.15, 0.05, 1.15], target: [0.05, 0.55, 0], polar: Math.PI * 0.96 },
+  'pocket-side': { pos: [0.32, 1.02, 1.12], target: [0, 0.74, 0.64], min: 0.2 },
+  'pocket-corner': { pos: [1.55, 1.02, 1.02], target: [1.22, 0.74, 0.58], min: 0.2 },
 }
 const framed = shot ? shots[shot] : undefined
 if (framed) {
   controls.enableDamping = false
   if (framed.polar) controls.maxPolarAngle = framed.polar
+  if (framed.min) controls.minDistance = framed.min
   camera.position.set(...framed.pos)
   controls.target.set(...framed.target)
   for (const id of ['hud', 'spin-wrap', 'power-wrap']) {
