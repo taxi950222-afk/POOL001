@@ -493,29 +493,61 @@ function addSweep(group: THREE.Group, mat: THREE.Material, path: PathPt[], secti
   addMesh(group, mat, pos)
 }
 
-/** Outer-corner band, clear of the mouth. Radii are measured from the plan corner center. */
-function cornerCapPlate(sx: number, sz: number): [number, number][] {
+/** Rail-top plate over the bare wood at a side mouth. The notch is the open hole. */
+function sideCapPlate(sign: 1 | -1): [number, number][] {
+  const xWide = 0.15
+  const mouth = 0.066
+  const zIn = sign * (HALF_W + 0.032)
+  const zOut = sign * (HALF_W + RAIL - 0.006)
+  const zBack = sign * (HALF_W + 0.158)
+  const pts: [number, number][] = [
+    [-xWide, zIn],
+    [-xWide, zOut],
+    [xWide, zOut],
+    [xWide, zIn],
+    [mouth, zIn],
+    [mouth, zBack],
+    [-mouth, zBack],
+    [-mouth, zIn],
+  ]
+  if (sign < 0) pts.reverse()
+  return pts
+}
+
+/** Rail-top plate from the corner mouth out over the bare wood. The arc side stays open. */
+function cornerCapPlate(mount: PocketMount): [number, number][] {
+  const gap = 0.014
+  const arc = cornerArc(mount).map(([x, z]) => {
+    const dx = x - mount.x
+    const dz = z - mount.z
+    const len = Math.hypot(dx, dz) || 1
+    return [x + (dx / len) * gap, z + (dz / len) * gap] as [number, number]
+  })
+  const a0 = arc[0]
+  const a1 = arc[arc.length - 1]
+  if (!a0 || !a1) return []
+  const sx = Math.sign(mount.x) || 1
+  const sz = Math.sign(mount.z) || 1
   const hx = HALF_L + RAIL
   const hz = HALF_W + RAIL
+  const inset = 0.01
   const cx = sx * (hx - V_CORNER)
   const cz = sz * (hz - V_CORNER)
-  const rOut = V_CORNER - 0.004
-  const rIn = V_CORNER - 0.046
+  const rad = V_CORNER - inset
+  const xFlat = sx * (hx - inset)
+  const zFlat = sz * (hz - inset)
   const ang0 = Math.atan2(0, sx)
   const ang1 = Math.atan2(sz, 0)
   let sweep = ang1 - ang0
   if (sweep > Math.PI) sweep -= Math.PI * 2
   if (sweep < -Math.PI) sweep += Math.PI * 2
-  const n = 12
   const outer: [number, number][] = []
-  const inner: [number, number][] = []
-  for (let i = 0; i <= n; i++) {
-    const a = ang0 + (sweep * i) / n
-    outer.push([cx + rOut * Math.cos(a), cz + rOut * Math.sin(a)])
-    inner.push([cx + rIn * Math.cos(a), cz + rIn * Math.sin(a)])
+  const steps = 10
+  for (let i = 0; i <= steps; i++) {
+    const a = ang0 + (sweep * i) / steps
+    outer.push([cx + rad * Math.cos(a), cz + rad * Math.sin(a)])
   }
-  inner.reverse()
-  return [...outer, ...inner]
+  return [...arc, [xFlat, a1[1]], ...outer, [a0[0], zFlat]]
 }
 
 function addPocketCaps(root: THREE.Group, mats: TableMaterials) {
@@ -530,15 +562,11 @@ function addPocketCaps(root: THREE.Group, mats: TableMaterials) {
   metal.opacity = 1
   metal.depthWrite = true
   const y0 = BED + WOOD_TOP + 0.005
-  const y1 = y0 + 0.004
-  for (const sign of [1, -1] as const) {
-    const zHole = sign * (HALF_W + 0.148)
-    const zIn = zHole + sign * 0.012
-    const zOut = sign * (HALF_W + RAIL - 0.004)
-    addBox(root, metal, -0.12, 0.12, y0, y1, Math.min(zIn, zOut), Math.max(zIn, zOut))
-  }
-  for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) extrudeFootprint(root, metal, cornerCapPlate(sx, sz), y0, y1)
+  const y1 = y0 + 0.0045
+  for (const sign of [1, -1] as const) extrudeFootprint(root, metal, sideCapPlate(sign), y0, y1)
+  for (const mount of pocketMounts()) {
+    if (mount.kind !== 'corner') continue
+    extrudeFootprint(root, metal, cornerCapPlate(mount), y0, y1)
   }
 }
 
