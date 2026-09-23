@@ -493,6 +493,84 @@ function addSweep(group: THREE.Group, mat: THREE.Material, path: PathPt[], secti
   addMesh(group, mat, pos)
 }
 
+/** Silver shell just outside the rail bullnose. u = 0 on the outer face, negative inward. */
+function capSection(reach: number): SectionPt[] {
+  const lift = 0.0036
+  const skin = 0.0018
+  const clamped = Math.min(Math.max(reach, 0.004), OUTER_R - 0.001)
+  const phiInner = Math.acos((OUTER_R - clamped) / OUTER_R)
+  const n = 10
+  const ring = (rad: number, from: number, to: number) => {
+    const pts: SectionPt[] = []
+    for (let i = 0; i <= n; i++) {
+      const phi = from + ((to - from) * i) / n
+      pts.push({
+        u: -OUTER_R + rad * Math.cos(phi),
+        y: WOOD_TOP - OUTER_R + rad * Math.sin(phi),
+      })
+    }
+    return pts
+  }
+  const pts = [...ring(OUTER_R + lift, phiInner, 0), ...ring(OUTER_R + lift - skin, 0, phiInner)]
+  const first = pts[0]
+  if (first) pts.push({ u: first.u, y: first.y })
+  return pts
+}
+
+function outerCornerPath(sx: number, sz: number): PathPt[] {
+  const hx = HALF_L + RAIL
+  const hz = HALF_W + RAIL
+  const cx = sx * (hx - V_CORNER)
+  const cz = sz * (hz - V_CORNER)
+  const ang0 = Math.atan2(0, sx)
+  const ang1 = Math.atan2(sz, 0)
+  let sweep = ang1 - ang0
+  if (sweep > Math.PI) sweep -= Math.PI * 2
+  if (sweep < -Math.PI) sweep += Math.PI * 2
+  const path: PathPt[] = []
+  const n = 14
+  for (let i = 0; i <= n; i++) {
+    const a = ang0 + (sweep * i) / n
+    path.push({
+      x: cx + V_CORNER * Math.cos(a),
+      z: cz + V_CORNER * Math.sin(a),
+      nx: Math.cos(a),
+      nz: Math.sin(a),
+    })
+  }
+  return path
+}
+
+function addPocketCaps(root: THREE.Group, mats: TableMaterials) {
+  const metal = mats.metal.clone()
+  metal.color.set('#e7eef2')
+  metal.metalness = 0.62
+  metal.roughness = 0.28
+  metal.side = THREE.DoubleSide
+  metal.transparent = false
+  metal.opacity = 1
+  metal.depthWrite = true
+  const reach = 0.024
+  const section = capSection(reach)
+  for (const sign of [1, -1] as const) {
+    const z = sign * (HALF_W + RAIL)
+    addSweep(
+      root,
+      metal,
+      [
+        { x: -0.115, z, nx: 0, nz: sign },
+        { x: 0.115, z, nx: 0, nz: sign },
+      ],
+      section,
+      true,
+      true,
+    )
+  }
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) addSweep(root, metal, outerCornerPath(sx, sz), section, true, true)
+  }
+}
+
 /** Rails, rounded cabinet, and the six pocket mouths. Physics is unchanged. */
 function addCabinet(root: THREE.Group, mats: TableMaterials) {
   const leather = mats.leather.clone()
@@ -628,6 +706,8 @@ function addCabinet(root: THREE.Group, mats: TableMaterials) {
       addBox(root, mats.oak, Math.min(x0, x1), Math.max(x0, x1), yBot, yUnder, Math.min(zRound, zCloth), Math.max(zRound, zCloth))
     }
   }
+
+  addPocketCaps(root, mats)
 }
 
 function bedShape() {
