@@ -493,81 +493,52 @@ function addSweep(group: THREE.Group, mat: THREE.Material, path: PathPt[], secti
   addMesh(group, mat, pos)
 }
 
-/** Silver shell just outside the rail bullnose. u = 0 on the outer face, negative inward. */
-function capSection(reach: number): SectionPt[] {
-  const lift = 0.0036
-  const skin = 0.0018
-  const clamped = Math.min(Math.max(reach, 0.004), OUTER_R - 0.001)
-  const phiInner = Math.acos((OUTER_R - clamped) / OUTER_R)
-  const n = 10
-  const ring = (rad: number, from: number, to: number) => {
-    const pts: SectionPt[] = []
-    for (let i = 0; i <= n; i++) {
-      const phi = from + ((to - from) * i) / n
-      pts.push({
-        u: -OUTER_R + rad * Math.cos(phi),
-        y: WOOD_TOP - OUTER_R + rad * Math.sin(phi),
-      })
-    }
-    return pts
-  }
-  const pts = [...ring(OUTER_R + lift, phiInner, 0), ...ring(OUTER_R + lift - skin, 0, phiInner)]
-  const first = pts[0]
-  if (first) pts.push({ u: first.u, y: first.y })
-  return pts
-}
-
-function outerCornerPath(sx: number, sz: number): PathPt[] {
+/** Outer-corner band, clear of the mouth. Radii are measured from the plan corner center. */
+function cornerCapPlate(sx: number, sz: number): [number, number][] {
   const hx = HALF_L + RAIL
   const hz = HALF_W + RAIL
   const cx = sx * (hx - V_CORNER)
   const cz = sz * (hz - V_CORNER)
+  const rOut = V_CORNER - 0.004
+  const rIn = V_CORNER - 0.046
   const ang0 = Math.atan2(0, sx)
   const ang1 = Math.atan2(sz, 0)
   let sweep = ang1 - ang0
   if (sweep > Math.PI) sweep -= Math.PI * 2
   if (sweep < -Math.PI) sweep += Math.PI * 2
-  const path: PathPt[] = []
-  const n = 14
+  const n = 12
+  const outer: [number, number][] = []
+  const inner: [number, number][] = []
   for (let i = 0; i <= n; i++) {
     const a = ang0 + (sweep * i) / n
-    path.push({
-      x: cx + V_CORNER * Math.cos(a),
-      z: cz + V_CORNER * Math.sin(a),
-      nx: Math.cos(a),
-      nz: Math.sin(a),
-    })
+    outer.push([cx + rOut * Math.cos(a), cz + rOut * Math.sin(a)])
+    inner.push([cx + rIn * Math.cos(a), cz + rIn * Math.sin(a)])
   }
-  return path
+  inner.reverse()
+  return [...outer, ...inner]
 }
 
 function addPocketCaps(root: THREE.Group, mats: TableMaterials) {
   const metal = mats.metal.clone()
-  metal.color.set('#e7eef2')
-  metal.metalness = 0.62
-  metal.roughness = 0.28
+  metal.color.set('#d8dde3')
+  metal.metalness = 0.6
+  metal.roughness = 0.35
+  metal.emissive.set('#c5ccd2')
+  metal.emissiveIntensity = 0.28
   metal.side = THREE.DoubleSide
   metal.transparent = false
   metal.opacity = 1
   metal.depthWrite = true
-  const reach = 0.024
-  const section = capSection(reach)
+  const y0 = BED + WOOD_TOP + 0.005
+  const y1 = y0 + 0.004
   for (const sign of [1, -1] as const) {
-    const z = sign * (HALF_W + RAIL)
-    addSweep(
-      root,
-      metal,
-      [
-        { x: -0.115, z, nx: 0, nz: sign },
-        { x: 0.115, z, nx: 0, nz: sign },
-      ],
-      section,
-      true,
-      true,
-    )
+    const zHole = sign * (HALF_W + 0.148)
+    const zIn = zHole + sign * 0.012
+    const zOut = sign * (HALF_W + RAIL - 0.004)
+    addBox(root, metal, -0.12, 0.12, y0, y1, Math.min(zIn, zOut), Math.max(zIn, zOut))
   }
   for (const sx of [-1, 1]) {
-    for (const sz of [-1, 1]) addSweep(root, metal, outerCornerPath(sx, sz), section, true, true)
+    for (const sz of [-1, 1]) extrudeFootprint(root, metal, cornerCapPlate(sx, sz), y0, y1)
   }
 }
 
