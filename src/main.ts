@@ -70,7 +70,7 @@ const shots: Record<string, { pos: [number, number, number]; target: [number, nu
   end: { pos: [2.65, 1.02, 0.02], target: [0, 0.7, 0] },
   under: { pos: [0.15, 0.05, 1.15], target: [0.05, 0.55, 0], polar: Math.PI * 0.96 },
   'pocket-side': { pos: [0.0, 1.42, 0.36], target: [0, 0.8, 0.74], min: 0.12 },
-  'pocket-corner': { pos: [1.02, 1.42, 0.36], target: [1.28, 0.8, 0.66], min: 0.12 },
+  'pocket-corner': { pos: [1.12, 1.62, 0.42], target: [1.3, 0.8, 0.64], min: 0.12 },
 }
 const framed = shot ? shots[shot] : undefined
 if (framed) {

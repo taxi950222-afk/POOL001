@@ -343,81 +343,11 @@ function extrudeFootprint(group: THREE.Group, mat: THREE.Material, pts: [number,
   group.add(mesh)
 }
 
-function clipRect(
-  pts: [number, number][],
-  x0: number,
-  x1: number,
-  z0: number,
-  z1: number,
-): [number, number][] {
-  const clipEdge = (
-    input: [number, number][],
-    inside: (p: [number, number]) => boolean,
-    at: (a: [number, number], b: [number, number]) => [number, number],
-  ) => {
-    if (input.length === 0) return input
-    const out: [number, number][] = []
-    for (let i = 0; i < input.length; i++) {
-      const s = input[i]
-      const e = input[(i + 1) % input.length]
-      if (!s || !e) continue
-      const si = inside(s)
-      const ei = inside(e)
-      if (si && ei) out.push(e)
-      else if (si && !ei) out.push(at(s, e))
-      else if (!si && ei) {
-        out.push(at(s, e))
-        out.push(e)
-      }
-    }
-    return out
-  }
-  const hitX = (x: number) => (a: [number, number], b: [number, number]): [number, number] => {
-    const t = (x - a[0]) / (b[0] - a[0] || 1e-9)
-    return [x, a[1] + (b[1] - a[1]) * t]
-  }
-  const hitZ = (z: number) => (a: [number, number], b: [number, number]): [number, number] => {
-    const t = (z - a[1]) / (b[1] - a[1] || 1e-9)
-    return [a[0] + (b[0] - a[0]) * t, z]
-  }
-  let p = pts
-  p = clipEdge(p, (q) => q[0] >= x0, hitX(x0))
-  p = clipEdge(p, (q) => q[0] <= x1, hitX(x1))
-  p = clipEdge(p, (q) => q[1] >= z0, hitZ(z0))
-  p = clipEdge(p, (q) => q[1] <= z1, hitZ(z1))
-  return p
-}
-
-function cornerArc(mount: PocketMount): [number, number][] {
-  const tracks = jawOpening(pocketParams('corner'), 'corner')
-  const a = tracks.left[tracks.left.length - 1]
-  const b = tracks.right[tracks.right.length - 1]
-  if (!a || !b) return []
-  const zApex = 0.125
-  const cz = 2 * zApex - 0.5 * (a.z + b.z)
-  const pts: [number, number][] = []
-  const steps = 14
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps
-    const u = 1 - t
-    const x = u * u * a.x + t * t * b.x
-    const z = u * u * a.z + 2 * u * t * cz + t * t * b.z
-    const w = localToWorld(mount, x, 0, z)
-    pts.push([w[0], w[2]])
-  }
-  return pts
-}
-
-function cornerWood(mount: PocketMount): [number, number][] {
-  const arc = cornerArc(mount)
-  const a0 = arc[0]
-  const a1 = arc[arc.length - 1]
-  if (!a0 || !a1) return []
-  const sx = Math.sign(mount.x) || 1
-  const sz = Math.sign(mount.z) || 1
-  const xOut = sx * (HALF_L + OAK_SPLIT - 0.02)
-  const zOut = sz * (HALF_W + OAK_SPLIT - 0.02)
-  return [...arc, [xOut, a1[1]], [xOut, zOut], [a0[0], zOut]]
+function cornerMouthOutline(mount: PocketMount): [number, number][] {
+  return createCornerProfile().map((p) => {
+    const w = localToWorld(mount, p.x, 0, p.z)
+    return [w[0], w[2]] as [number, number]
+  })
 }
 
 function sideOak(sign: 1 | -1): [number, number][] {
@@ -514,15 +444,9 @@ function sideCapPlate(sign: 1 | -1): [number, number][] {
   return pts
 }
 
-/** Rail-top plate from the corner mouth out over the bare wood. The arc side stays open. */
+/** Rail-top plate. Inner edge is the jaw fillet. Outer edge is the cabinet corner. The mouth stays open. */
 function cornerCapPlate(mount: PocketMount): [number, number][] {
-  const gap = 0.014
-  const arc = cornerArc(mount).map(([x, z]) => {
-    const dx = x - mount.x
-    const dz = z - mount.z
-    const len = Math.hypot(dx, dz) || 1
-    return [x + (dx / len) * gap, z + (dz / len) * gap] as [number, number]
-  })
+  const arc = cornerMouthOutline(mount)
   const a0 = arc[0]
   const a1 = arc[arc.length - 1]
   if (!a0 || !a1) return []
@@ -530,19 +454,18 @@ function cornerCapPlate(mount: PocketMount): [number, number][] {
   const sz = Math.sign(mount.z) || 1
   const hx = HALF_L + RAIL
   const hz = HALF_W + RAIL
-  const inset = 0.01
   const cx = sx * (hx - V_CORNER)
   const cz = sz * (hz - V_CORNER)
-  const rad = V_CORNER - inset
-  const xFlat = sx * (hx - inset)
-  const zFlat = sz * (hz - inset)
+  const rad = V_CORNER
+  const xFlat = sx * hx
+  const zFlat = sz * hz
   const ang0 = Math.atan2(0, sx)
   const ang1 = Math.atan2(sz, 0)
   let sweep = ang1 - ang0
   if (sweep > Math.PI) sweep -= Math.PI * 2
   if (sweep < -Math.PI) sweep += Math.PI * 2
   const outer: [number, number][] = []
-  const steps = 10
+  const steps = 12
   for (let i = 0; i <= steps; i++) {
     const a = ang0 + (sweep * i) / steps
     outer.push([cx + rad * Math.cos(a), cz + rad * Math.sin(a)])
@@ -561,13 +484,57 @@ function addPocketCaps(root: THREE.Group, mats: TableMaterials) {
   metal.transparent = false
   metal.opacity = 1
   metal.depthWrite = true
-  const y0 = BED + WOOD_TOP + 0.005
-  const y1 = y0 + 0.0045
-  for (const sign of [1, -1] as const) extrudeFootprint(root, metal, sideCapPlate(sign), y0, y1)
+  const ySide0 = BED + WOOD_TOP + 0.005
+  const ySide1 = ySide0 + 0.0045
+  const yCorner0 = BED + WOOD_TOP
+  const yCorner1 = yCorner0 + 0.004
+  for (const sign of [1, -1] as const) extrudeFootprint(root, metal, sideCapPlate(sign), ySide0, ySide1)
   for (const mount of pocketMounts()) {
     if (mount.kind !== 'corner') continue
-    extrudeFootprint(root, metal, cornerCapPlate(mount), y0, y1)
+    extrudeFootprint(root, metal, cornerCapPlate(mount), yCorner0, yCorner1)
   }
+}
+
+/** Corner mouth: leather rim only, and an open net hung below the rail. */
+function addCornerMouth(root: THREE.Group, mount: PocketMount, leather: THREE.Material) {
+  const params = pocketParams('corner')
+  const pocket = createPocketMesh('corner', params)
+  pocket.position.set(mount.x, mount.y, mount.z)
+  pocket.rotation.y = mount.yaw
+  const filled = new Set(['JawL', 'JawR', 'Shelf', 'Throat', 'Drop'])
+  const gone: THREE.Object3D[] = []
+  pocket.traverse((obj) => {
+    if (filled.has(obj.name)) gone.push(obj)
+  })
+  for (const obj of gone) obj.parent?.remove(obj)
+  pocket.traverse((obj) => {
+    if (obj instanceof THREE.Mesh) {
+      obj.material = leather
+      obj.castShadow = true
+      obj.receiveShadow = true
+    }
+  })
+  root.add(pocket)
+
+  const half = params.throatWidth / 2
+  const z0 = params.jawRadius
+  const z1 = params.depth * 0.8
+  const y = WOOD_BOTTOM - 0.05
+  const straps = 4
+  const thick = 0.0035
+  const net = new THREE.Group()
+  net.position.set(mount.x, mount.y, mount.z)
+  net.rotation.y = mount.yaw
+  for (let i = 0; i < straps; i++) {
+    const t = i / (straps - 1)
+    const sag = 0.016 * Math.sin(Math.PI * t)
+    const alongX = new THREE.Mesh(new THREE.BoxGeometry(thick, thick, Math.max(0.01, z1 - z0)), leather)
+    alongX.position.set(-half + 2 * half * t, y - sag, (z0 + z1) / 2)
+    const across = new THREE.Mesh(new THREE.BoxGeometry(half * 2, thick, thick), leather)
+    across.position.set(0, y - sag * 0.6, z0 + (z1 - z0) * t)
+    net.add(alongX, across)
+  }
+  root.add(net)
 }
 
 /** Rails, rounded cabinet, and the six pocket mouths. Physics is unchanged. */
@@ -588,50 +555,27 @@ function addCabinet(root: THREE.Group, mats: TableMaterials) {
 
   for (const mount of pocketMounts()) {
     const params = pocketParams(mount.kind)
-    const pocket = createPocketMesh(mount.kind, params)
-    pocket.position.set(mount.x, mount.y, mount.z)
-    pocket.rotation.y = mount.yaw
-    pocket.traverse((obj) => {
-      if (obj instanceof THREE.Mesh) {
-        obj.material = leather
-        obj.castShadow = true
-        obj.receiveShadow = true
-      }
-    })
-    root.add(pocket)
+    if (mount.kind === 'side') {
+      const pocket = createPocketMesh(mount.kind, params)
+      pocket.position.set(mount.x, mount.y, mount.z)
+      pocket.rotation.y = mount.yaw
+      pocket.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.material = leather
+          obj.castShadow = true
+          obj.receiveShadow = true
+        }
+      })
+      root.add(pocket)
+    } else {
+      addCornerMouth(root, mount, leather)
+    }
     const tracks = jawOpening(params, mount.kind)
     for (const track of [tracks.left, tracks.right]) {
       const jaw = jawPath(mount, track)
       if (!jaw) continue
       cuts[jaw.rail].push(jaw.cut)
-      addSweep(root, cloth, jaw.path, nose, false, true)
-    }
-    if (mount.kind === 'corner') {
-      const wood = cornerWood(mount)
-      extrudeFootprint(root, oak, wood, BED + WOOD_BOTTOM, BED + WOOD_TOP)
-      const sx = Math.sign(mount.x) || 1
-      const sz = Math.sign(mount.z) || 1
-      const bands = [
-        {
-          x0: sx > 0 ? -2 : sx * (HALF_L + CLOTH_REACH),
-          x1: sx > 0 ? sx * (HALF_L + CLOTH_REACH) : 2,
-          z0: sz * (HALF_W + ROUND_R - 0.002),
-          z1: sz * (HALF_W + CLOTH_REACH),
-        },
-        {
-          x0: sx * (HALF_L + ROUND_R - 0.002),
-          x1: sx * (HALF_L + CLOTH_REACH),
-          z0: sz > 0 ? -2 : sz * (HALF_W + CLOTH_REACH),
-          z1: sz > 0 ? sz * (HALF_W + CLOTH_REACH) : 2,
-        },
-      ]
-      for (const band of bands) {
-        const loX = Math.min(band.x0, band.x1)
-        const hiX = Math.max(band.x0, band.x1)
-        const loZ = Math.min(band.z0, band.z1)
-        const hiZ = Math.max(band.z0, band.z1)
-        extrudeFootprint(root, clothTop, clipRect(wood, loX, hiX, loZ, hiZ), BED + WOOD_TOP - 0.004, BED + WOOD_TOP)
-      }
+      if (mount.kind !== 'corner') addSweep(root, cloth, jaw.path, nose, false, true)
     }
   }
 
