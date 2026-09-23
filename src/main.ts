@@ -63,13 +63,47 @@ controls.maxDistance = 7.2
 controls.enablePan = false
 controls.mouseButtons.LEFT = -1 as unknown as THREE.MOUSE
 controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE
+const shot = new URLSearchParams(location.search).get('shot')
+const shots: Record<string, { pos: [number, number, number]; target: [number, number, number]; polar?: number }> = {
+  side: { pos: [0.05, 1.02, 2.45], target: [0.05, 0.7, 0] },
+  corner: { pos: [2.05, 1.15, 1.7], target: [0.2, 0.68, 0.05] },
+  end: { pos: [2.65, 1.02, 0.02], target: [0, 0.7, 0] },
+  under: { pos: [0.15, 0.05, 1.15], target: [0.05, 0.55, 0], polar: Math.PI * 0.96 },
+}
+const framed = shot ? shots[shot] : undefined
+if (framed) {
+  controls.enableDamping = false
+  if (framed.polar) controls.maxPolarAngle = framed.polar
+  camera.position.set(...framed.pos)
+  controls.target.set(...framed.target)
+  for (const id of ['hud', 'spin-wrap', 'power-wrap']) {
+    const el = document.getElementById(id)
+    if (el) el.style.display = 'none'
+  }
+}
 controls.update()
 
 const mats = createMaterials()
 const table = buildTable(mats)
 scene.add(table.root)
-scene.add(new THREE.HemisphereLight('#6d655c', '#1a1612', 0.22))
-scene.add(new THREE.AmbientLight('#2a2118', 0.08))
+const hemi = new THREE.HemisphereLight('#6d655c', '#1a1612', 0)
+const ambient = new THREE.AmbientLight('#2a2118', 0)
+scene.add(hemi, ambient)
+// Full level is the previous shade (spot 7) plus the fill that washed the cloth out.
+// The slider is 0–100. 25 is a quarter of that shade, which is the default.
+const LAMP_FULL = { spot: 7, hemi: 0.22, ambient: 0.08, inside: 0.35, bulb: 0.45, env: 1 }
+const lampInput = must<HTMLInputElement>('#lamp')
+const applyLamp = (percent: number) => {
+  const f = Math.min(1, Math.max(0, percent / 100))
+  for (const spot of table.lights) spot.intensity = LAMP_FULL.spot * f
+  hemi.intensity = LAMP_FULL.hemi * f
+  ambient.intensity = LAMP_FULL.ambient * f
+  mats.lampInside.emissiveIntensity = LAMP_FULL.inside * f
+  for (const bulb of table.bulbs) bulb.emissiveIntensity = LAMP_FULL.bulb * f
+  scene.environmentIntensity = LAMP_FULL.env * f
+}
+applyLamp(Number(lampInput.value))
+lampInput.addEventListener('input', () => applyLamp(Number(lampInput.value)))
 
 const world = createWorld()
 const balls = createBallMeshes()
