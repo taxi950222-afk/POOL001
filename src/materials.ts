@@ -216,7 +216,7 @@ export function createMaterials(): TableMaterials {
     lampInside: new THREE.MeshStandardMaterial({
       color: '#ffd7a8',
       emissive: '#ff9a3c',
-      emissiveIntensity: 1.4,
+      emissiveIntensity: 0.35,
       roughness: 0.5,
       side: THREE.BackSide,
     }),

@@ -41,7 +41,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75))
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.toneMapping = THREE.ACESFilmicToneMapping
-renderer.toneMappingExposure = 1.05
+renderer.toneMappingExposure = 0.92
 renderer.shadowMap.enabled = true
 renderer.shadowMap.type = THREE.PCFShadowMap
 
@@ -68,8 +68,8 @@ controls.update()
 const mats = createMaterials()
 const table = buildTable(mats)
 scene.add(table.root)
-scene.add(new THREE.HemisphereLight('#6d655c', '#1a1612', 0.42))
-scene.add(new THREE.AmbientLight('#2a2118', 0.14))
+scene.add(new THREE.HemisphereLight('#6d655c', '#1a1612', 0.22))
+scene.add(new THREE.AmbientLight('#2a2118', 0.08))
 
 const world = createWorld()
 const balls = createBallMeshes()
