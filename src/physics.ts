@@ -48,7 +48,7 @@ export interface World {
 export type SimEvent =
   | { t: 'ball'; speed: number }
   | { t: 'cushion'; speed: number }
-  | { t: 'pocket'; id: BallId }
+  | { t: 'pocket'; id: BallId; speed: number }
   | { t: 'off'; id: BallId }
 
 const HW = tableHardware()
@@ -404,9 +404,10 @@ interface PocketHit {
 function pocketsAndOff(_world: World, b: Ball, events: SimEvent[]) {
   if (b.state !== 'live') return
   if (b.y < BED + 0.08 && captured(b)) {
+    const speed = Math.hypot(b.vx, b.vy, b.vz)
     b.state = 'pocket'
     b.vx = b.vy = b.vz = 0
-    events.push({ t: 'pocket', id: b.id })
+    events.push({ t: 'pocket', id: b.id, speed })
     return
   }
   const outside =

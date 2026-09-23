@@ -388,7 +388,7 @@ function frame(now: number) {
       for (const ev of step(world, sub)) {
         if (ev.t === 'ball') audio.ball(ev.speed)
         else if (ev.t === 'cushion') audio.cushion(ev.speed)
-        else if (ev.t === 'pocket') audio.pocket()
+        else if (ev.t === 'pocket') audio.pocket(ev.speed)
       }
       accum -= sub
       guard++

@@ -2,7 +2,7 @@ export function createAudio() {
   const AudioCtx = window.AudioContext
   let ctx: AudioContext | null = null
   let noise: AudioBuffer | null = null
-  let last = 0
+  const lastHit = { ball: 0, cushion: 0 }
 
   function context() {
     if (!ctx) {
@@ -50,11 +50,15 @@ export function createAudio() {
     src.stop(t + dur + 0.02)
   }
 
-  function allow() {
+  function allow(kind: 'ball' | 'cushion') {
     const now = performance.now()
-    if (now - last < 28) return false
-    last = now
+    if (now - lastHit[kind] < 32) return false
+    lastHit[kind] = now
     return true
+  }
+
+  function level(speed: number, quiet: number, per: number, cap: number) {
+    return Math.min(cap, quiet + Math.max(0, speed) * per)
   }
 
   return {
@@ -62,20 +66,19 @@ export function createAudio() {
       context()
     },
     cue(power: number) {
-      burst(140 + power * 80, 0.09, 'sine', 0.22 + power * 0.18, 900, 0.7)
+      const p = Math.max(0, Math.min(1, power))
+      burst(120 + p * 90, 0.08, 'sine', 0.12 + p * 0.28, 420, 0.6)
     },
     ball(speed: number) {
-      if (!allow()) return
-      const g = Math.min(0.22, 0.04 + speed * 0.03)
-      burst(1800 + Math.min(speed, 6) * 180, 0.045, 'triangle', g, 2400, 1.2)
+      if (!allow('ball')) return
+      burst(1600 + Math.min(speed, 8) * 160, 0.04, 'triangle', level(speed, 0.03, 0.045, 0.32), 2800, 1.4)
     },
     cushion(speed: number) {
-      if (!allow()) return
-      const g = Math.min(0.18, 0.035 + speed * 0.02)
-      burst(220, 0.07, 'sine', g, 700, 0.6)
+      if (!allow('cushion')) return
+      burst(180 + Math.min(speed, 6) * 24, 0.07, 'sine', level(speed, 0.03, 0.028, 0.26), 640, 0.55)
     },
-    pocket() {
-      burst(180, 0.16, 'sine', 0.16, 400, 0.8)
+    pocket(speed: number) {
+      burst(140, 0.18, 'sine', level(speed, 0.05, 0.04, 0.3), 360, 0.7)
     },
     click() {
       burst(2400, 0.04, 'square', 0.08, 3000, 2)
