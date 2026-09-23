@@ -353,6 +353,20 @@ export function runRuleChecks() {
   if (m.scores[1] !== 1 || !m.ballInHand || Number(m.current) !== 1) throw new Error('miss foul')
 
   m = createMatch()
+  const legalPlayer = m.current
+  const legalScores: [number, number] = [m.scores[0], m.scores[1]]
+  onShotStart(m)
+  resolve(m, base())
+  if (
+    m.current === legalPlayer ||
+    m.scores[0] !== legalScores[0] ||
+    m.scores[1] !== legalScores[1] ||
+    m.lastCall.includes('犯规')
+  ) {
+    throw new Error(`legal hit ${m.lastCall} player ${m.current} ${m.scores}`)
+  }
+
+  m = createMatch()
   m.isBreakShot = false
   m.isBreakVisit = false
   m.breakWasDry = false

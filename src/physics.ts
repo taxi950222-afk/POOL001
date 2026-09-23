@@ -252,6 +252,25 @@ function contactVel(b: Ball, rx: number, ry: number, rz: number) {
   }
 }
 
+/** Record a cue hit while the balls still overlap. The position push below can open a light contact before collideBalls() sees it. */
+function noteCueOverlap(world: World, a: Ball, b: Ball, nx: number, ny: number, nz: number) {
+  if (world.firstContact !== null) return
+  if (a.state !== 'live' || b.state !== 'live') return
+  const cueIsA = a.id === 'cue'
+  if (cueIsA === (b.id === 'cue')) return
+  const cue = cueIsA ? a : b
+  const other = cueIsA ? b : a
+  const sgn = cueIsA ? 1 : -1
+  const nnx = nx * sgn
+  const nny = ny * sgn
+  const nnz = nz * sgn
+  const va = contactVel(cue, nnx * R, nny * R, nnz * R)
+  const vb = contactVel(other, -nnx * R, -nny * R, -nnz * R)
+  const un = (vb.x - va.x) * nnx + (vb.y - va.y) * nny + (vb.z - va.z) * nnz
+  if (un >= 0) return
+  world.firstContact = other.id
+}
+
 function notePair(world: World, a: Ball, b: Ball) {
   const other = (id: BallId) => (id === 'cue' ? (a.id === 'cue' ? b.id : a.id) : null)
   if (a.id === 'cue' || b.id === 'cue') {
@@ -459,6 +478,7 @@ function collideCushions(world: World, b: Ball, events: SimEvent[]) {
 function pocketsAndOff(_world: World, b: Ball, events: SimEvent[]) {
   if (b.state !== 'live') return
   if (overPocketMouth(b.x, b.y, b.z)) return
+  if (b.y <= BED + R + 0.01) return
   const outside =
     Math.abs(b.x) > HALF_L + 0.015 || Math.abs(b.z) > HALF_W + 0.015
   const far =
@@ -515,6 +535,7 @@ export function step(world: World, dt: number): SimEvent[] {
         contacts.push({ a, b, nx: dx / d, ny: dy / d, nz: dz / d, pen: R * 2 - d })
       }
     }
+    for (const c of contacts) noteCueOverlap(world, c.a, c.b, c.nx, c.ny, c.nz)
     const shift = new Map<Ball, [number, number, number]>()
     for (const c of contacts) {
       if (c.pen < 0.00012) continue
